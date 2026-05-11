@@ -104,6 +104,8 @@ export class DoubaoSession extends EventEmitter {
   private readonly connectId: string
   private finishResolve: (() => void) | null = null
   private finishReject: ((err: Error) => void) | null = null
+  private firstResponseResolve: (() => void) | null = null
+  private firstResponseReject: ((err: Error) => void) | null = null
   private retried = false
 
   constructor(private readonly config: DoubaoSessionConfig) {
@@ -206,16 +208,32 @@ export class DoubaoSession extends EventEmitter {
 
     try {
       await this.connect(url, headers)
+      const firstResp = new Promise<void>((resolve, reject) => {
+        this.firstResponseResolve = resolve
+        this.firstResponseReject = reject
+      })
       this.sendFullClientRequest()
+      await Promise.race([
+        firstResp,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('handshake timeout')), 3000),
+        ),
+      ])
+      this.firstResponseResolve = null
+      this.firstResponseReject = null
       this.state = 'ready'
     } catch (err) {
-      if (!this.retried && this.isRetryable(err)) {
+      // 如果 state 已经是 error，说明 handleIncoming 里已 emit 过具体 ASRError，
+      // 这里不重复发；只在真正未处理过的 case（如 ws connect 失败 / handshake timeout）才补一发
+      if (!this.retried && this.isRetryable(err) && (this.state as State) !== 'error') {
         this.retried = true
         await new Promise((r) => setTimeout(r, 500))
         return this.openWsAndHandshake()
       }
-      const asrErr = this.toASRError(err)
-      this.emitError(asrErr)
+      if ((this.state as State) !== 'error') {
+        const asrErr = this.toASRError(err)
+        this.emitError(asrErr)
+      }
       this.cleanup()
       throw err
     }
@@ -322,6 +340,15 @@ export class DoubaoSession extends EventEmitter {
     }
 
     if (frame.header.messageType !== MessageType.FULL_SERVER_RESPONSE) return
+
+    // 首个 server response 视为 handshake ack，解锁 start() 的等待。
+    // 其内容仍按下面分支统一处理（一般是 text='' 会被空 partial 过滤掉）。
+    if (this.firstResponseResolve) {
+      const r = this.firstResponseResolve
+      this.firstResponseResolve = null
+      r()
+    }
+
     if (typeof frame.payload !== 'object' || frame.payload === null) return
 
     const payload = frame.payload as Record<string, unknown>
@@ -330,9 +357,10 @@ export class DoubaoSession extends EventEmitter {
     const text = typeof result.text === 'string' ? result.text : null
     if (text === null) return
 
-    // 最后一帧（flags 含 NEG bit）→ final，触发 finish() resolve
+    // 仅以 server 帧 flags 的 NEG bit 判定 final；不能用 client 端 state == 'finishing'，
+    // 因为 finish() 发出 last 帧后服务端可能仍有未消费完的 partial 在路上。
     const isLast = (frame.header.flags & 0b0010) !== 0
-    if (isLast || this.state === 'finishing') {
+    if (isLast) {
       this.emit('final', text)
       if (this.finishResolve) {
         const r = this.finishResolve
@@ -342,6 +370,8 @@ export class DoubaoSession extends EventEmitter {
       }
       this.cleanup()
     } else {
+      // 空文本的 ack / keep-alive 不向上层散播 partial（避免 UI 闪烁）
+      if (text === '') return
       this.emit('partial', text)
     }
   }
@@ -367,6 +397,12 @@ export class DoubaoSession extends EventEmitter {
     if (this.state === 'error') return
     this.state = 'error'
     this.emit('error', err)
+    if (this.firstResponseReject) {
+      const rej = this.firstResponseReject
+      this.firstResponseResolve = null
+      this.firstResponseReject = null
+      rej(new Error(err.message))
+    }
     if (this.finishReject) {
       const rej = this.finishReject
       this.finishResolve = null
@@ -385,7 +421,7 @@ export class DoubaoSession extends EventEmitter {
       }
       this.ws = null
     }
-    if (this.state !== 'error') this.state = 'closed'
+    if ((this.state as State) !== 'error') this.state = 'closed'
   }
 
   private isRetryable(err: unknown): boolean {
