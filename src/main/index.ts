@@ -22,6 +22,7 @@ import {
 import { createAllWindows, getAppWindows, hideHudWindow, showHudOnActiveScreen } from './windows.js'
 import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
 import { createTray, destroyTray } from './tray.js'
+import { startPeriodicUpdateCheck, stopPeriodicUpdateCheck } from './updater/index.js'
 
 /* ───── dev .env override（无 .env 则走 store） ───── */
 
@@ -127,6 +128,7 @@ if (!gotLock) {
 
     createAllWindows()
     createTray()
+    startPeriodicUpdateCheck()
 
     const env = loadDotEnv()
     const hasEnvCreds = !!buildDoubaoFromEnv(env)
@@ -195,6 +197,7 @@ if (!gotLock) {
   app.on('will-quit', () => {
     stopHotkeyListener()
     destroyTray()
+    stopPeriodicUpdateCheck()
   })
 
   app.on('window-all-closed', () => {

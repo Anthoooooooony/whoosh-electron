@@ -8,6 +8,7 @@
 //   - 注册函数 idempotent（重复调用 throw），由 main/index.ts 在 app.whenReady 之后调用一次
 
 import { app, ipcMain, shell, systemPreferences } from 'electron'
+import { checkOnce as updaterCheckOnce } from '../updater/index.js'
 import { z } from 'zod'
 import { Channels } from '@shared/ipc/channels.js'
 import type { InvokeContract, SendContract } from '@shared/ipc/types.js'
@@ -177,9 +178,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     return { granted: true }
   })
 
-  handleInvoke(Channels.UPDATER_CHECK, null, () => {
-    console.info('[ipc] updater:check (stub)')
-    return { hasUpdate: false }
+  handleInvoke(Channels.UPDATER_CHECK, null, async () => {
+    return updaterCheckOnce()
   })
 
   // ─── send (one-way) ───────────────────────
