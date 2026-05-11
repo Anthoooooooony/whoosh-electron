@@ -2,7 +2,7 @@
 // M2 阶段：app lifecycle + single-instance lock + 四个 BrowserWindow 创建
 // 后续 milestone 在 ready 之后逐步挂载：M3 IPC、M5 uiohook、M9 SessionOrchestrator…
 
-import { app } from 'electron'
+import { app, session } from 'electron'
 import { createAllWindows } from './windows.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { startHotkeyListener, stopHotkeyListener } from './hotkey/index.js'
@@ -17,6 +17,11 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    // 允许 audio renderer 调 getUserMedia 拿麦克风（macOS 系统级 mic 权限另外谈）
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(permission === 'media')
+    })
+
     registerIpcHandlers()
     createAllWindows()
     startHotkeyListener()

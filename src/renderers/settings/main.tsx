@@ -1,4 +1,3 @@
-import '../_shared/global'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 

@@ -147,9 +147,14 @@ export function registerIpcHandlers(): void {
   })
 
   // ─── send (one-way) ───────────────────────
+  // M6 临时：每 25 chunks（约 1 秒）打一条 info，验证 audio pipeline 通了
+  // M9 SessionOrchestrator 接管后这里改为静默喂 provider
+  let audioChunkCount = 0
   handleSend(Channels.AUDIO_CHUNK, AudioChunkSchema, (payload) => {
-    // M9 之后由 SessionOrchestrator 消费
-    console.debug('[ipc] audio:chunk', { bytes: payload.chunk.byteLength })
+    audioChunkCount++
+    if (audioChunkCount === 1 || audioChunkCount % 25 === 0) {
+      console.info(`[ipc] audio:chunk #${audioChunkCount} · ${payload.chunk.byteLength} bytes`)
+    }
   })
 
   handleSend(Channels.AUDIO_SET_DEVICE, null, () => {
