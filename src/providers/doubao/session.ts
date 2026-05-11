@@ -322,10 +322,17 @@ export class DoubaoSession extends EventEmitter {
 
     if (frame.header.messageType === MessageType.SERVER_ERROR_RESPONSE) {
       const serverCode = frame.errorCode ?? -1
+      // Payload 文档里说是 JSON，实际服务端可能用 .error / .error_msg / .message 不同 key；
+      // 都试一遍，都没有就把整个 payload stringify 作为 message 留下排查线索
       let message = `server error ${serverCode}`
       if (typeof frame.payload === 'object' && frame.payload !== null) {
-        const payload = frame.payload as Record<string, unknown>
-        if (typeof payload.message === 'string') message = payload.message
+        const p = frame.payload as Record<string, unknown>
+        const candidate =
+          (typeof p.message === 'string' && p.message) ||
+          (typeof p.error === 'string' && p.error) ||
+          (typeof p.error_msg === 'string' && p.error_msg) ||
+          ''
+        message = candidate || JSON.stringify(p)
       } else if (typeof frame.payload === 'string') {
         message = frame.payload
       }
