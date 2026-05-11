@@ -18,11 +18,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.0.9
-
       - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Activate pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.9 --activate
+
+      - name: Configure pnpm cache
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
