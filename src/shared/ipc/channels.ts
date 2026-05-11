@@ -48,6 +48,9 @@ export const Channels = {
   // 更新
   UPDATER_CHECK: 'updater:check', // invoke
   UPDATER_NEW_VERSION: 'updater:new-version', // broadcast
+
+  // 应用控制
+  APP_RELAUNCH: 'app:relaunch', // send: renderer → main，触发 app.relaunch() + exit
 } as const
 
 export type ChannelName = (typeof Channels)[keyof typeof Channels]

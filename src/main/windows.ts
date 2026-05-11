@@ -93,7 +93,7 @@ export function createAllWindows(): AppWindows {
   const settings = new BrowserWindow({
     width: 880,
     height: 580,
-    show: true,
+    show: false, // main 进程根据 onboarding 状态决定 show；M14 menubar/tray 后默认不显示
     title: 'whoosh — 偏好设置',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
@@ -108,7 +108,7 @@ export function createAllWindows(): AppWindows {
   const onboarding = new BrowserWindow({
     width: 580,
     height: 680,
-    show: true,
+    show: false, // main 根据 onboarding.done 决定首次展示
     title: '欢迎使用 whoosh',
     resizable: false,
     minimizable: false,

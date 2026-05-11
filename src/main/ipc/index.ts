@@ -7,7 +7,7 @@
 //   - audio:chunk 在 M9 由 SessionOrchestrator 消费（通过 onAudioChunk 注入回调）
 //   - 注册函数 idempotent（重复调用 throw），由 main/index.ts 在 app.whenReady 之后调用一次
 
-import { ipcMain } from 'electron'
+import { app, ipcMain, shell, systemPreferences } from 'electron'
 import { z } from 'zod'
 import { Channels } from '@shared/ipc/channels.js'
 import type { InvokeContract, SendContract } from '@shared/ipc/types.js'
@@ -41,6 +41,8 @@ export interface IpcHandlerDeps {
   testProviderConnection(
     req: z.infer<typeof ProviderTestConnectionRequestSchema>,
   ): Promise<z.infer<typeof ProviderTestConnectionResponseSchema>>
+  /** Onboarding 完成时调；通常隐藏 onboarding window + 显示 settings */
+  onOnboardingDone(): void
 }
 
 // ───────────────────────────────────────────
@@ -134,23 +136,45 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   )
 
   handleInvoke(Channels.ONBOARDING_GET_STEP, null, () => {
-    console.info('[ipc] onboarding:get-step (stub)')
-    return { step: 1 as const, platform: process.platform as 'darwin' | 'win32' | 'linux' }
+    const cfg = deps.getConfig()
+    const completed = new Set(cfg.onboarding.completedSteps)
+    // 决定从哪一步开始：找到第一个未完成的步骤
+    const platform = process.platform as 'darwin' | 'win32' | 'linux'
+    const allSteps: (1 | 2 | 3 | 4)[] = platform === 'darwin' ? [1, 2, 3, 4] : [1, 2, 4]
+    const next = allSteps.find((s) => !completed.has(`step${s}`))
+    return { step: (next ?? 4) as 1 | 2 | 3 | 4, platform }
   })
 
   handleInvoke(Channels.ONBOARDING_COMPLETE_STEP, OnboardingCompleteStepRequestSchema, (req) => {
-    console.info('[ipc] onboarding:complete-step (stub)', req)
-    return { nextStep: null }
+    const cfg = deps.getConfig()
+    const completed = Array.from(new Set([...cfg.onboarding.completedSteps, `step${req.step}`]))
+    deps.setConfig({ onboarding: { completedSteps: completed, done: cfg.onboarding.done } })
+    const platform = process.platform as 'darwin' | 'win32' | 'linux'
+    const allSteps: (1 | 2 | 3 | 4)[] = platform === 'darwin' ? [1, 2, 3, 4] : [1, 2, 4]
+    const nextStep = allSteps.find((s) => !completed.includes(`step${s}`))
+    return { nextStep: (nextStep ?? null) as 1 | 2 | 3 | 4 | null }
   })
 
-  handleInvoke(Channels.PERMISSION_STATUS, null, () => {
-    console.info('[ipc] permission:status (stub)')
-    return { mic: false, accessibility: process.platform === 'darwin' ? false : null }
+  handleInvoke(Channels.PERMISSION_STATUS, null, async () => {
+    let mic = false
+    if (process.platform === 'darwin' || process.platform === 'win32') {
+      const status = systemPreferences.getMediaAccessStatus('microphone')
+      mic = status === 'granted'
+    } else {
+      mic = true // Linux 没标准权限模型，默认 true
+    }
+    const accessibility =
+      process.platform === 'darwin' ? systemPreferences.isTrustedAccessibilityClient(false) : null
+    return { mic, accessibility }
   })
 
-  handleInvoke(Channels.PERMISSION_REQUEST_MIC, null, () => {
-    console.info('[ipc] permission:request-mic (stub)')
-    return { granted: false }
+  handleInvoke(Channels.PERMISSION_REQUEST_MIC, null, async () => {
+    if (process.platform === 'darwin') {
+      const granted = await systemPreferences.askForMediaAccess('microphone')
+      return { granted }
+    }
+    // Windows 在 getUserMedia 时由 session.permissionRequestHandler 处理；这里乐观返回 true
+    return { granted: true }
   })
 
   handleInvoke(Channels.UPDATER_CHECK, null, () => {
@@ -178,10 +202,35 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleSend(Channels.ONBOARDING_DONE, null, () => {
-    console.info('[ipc] onboarding:done (stub)')
+    const cfg = deps.getConfig()
+    deps.setConfig({
+      onboarding: { completedSteps: cfg.onboarding.completedSteps, done: true },
+    })
+    deps.onOnboardingDone()
   })
 
   handleSend(Channels.PERMISSION_OPEN_SYSTEM_PREFS, PermissionOpenSystemPrefsSchema, (payload) => {
-    console.info('[ipc] permission:open-system-prefs (stub)', payload)
+    if (process.platform === 'darwin') {
+      const url =
+        payload.pane === 'accessibility'
+          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+          : 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+      void shell.openExternal(url)
+    } else if (process.platform === 'win32') {
+      void shell.openExternal(
+        payload.pane === 'microphone' ? 'ms-settings:privacy-microphone' : 'ms-settings:privacy',
+      )
+    }
   })
+
+  handleSend(Channels.APP_RELAUNCH, null, () => {
+    app.relaunch()
+    app.exit(0)
+  })
+}
+
+// app 重启工具（onboarding Step 3 Accessibility 授权后用）
+export function relaunchApp(): void {
+  app.relaunch()
+  app.exit(0)
 }
