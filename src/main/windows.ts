@@ -1,6 +1,9 @@
 // 四个 BrowserWindow 的创建与管理
-// M2 阶段：让窗口都能加载对应 renderer；不上 panel type / always-on-top / 等高级特性
-// 那些都会在 M10（HUD 视觉）/ M11（设置）/ M12（Onboarding）阶段补全
+//
+// audio：常驻隐藏 renderer，承载 getUserMedia + AudioWorklet
+// hud：底部胶囊，启动隐藏；orchestrator 在 START_RECORDING 后 50ms 才调 showHud()
+//      避免误触闪烁，松开/失败时调 hideHud()
+// settings / onboarding：按需打开
 
 import { BrowserWindow, screen } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -12,16 +15,17 @@ const isDev = !!process.env['ELECTRON_RENDERER_URL']
 type RendererName = 'audio' | 'hud' | 'settings' | 'onboarding'
 
 function rendererURL(name: RendererName): string {
-  // dev: vite 的 root 配为 src/renderers/，所以服务在 /{name}/index.html
   if (isDev) return `${process.env['ELECTRON_RENDERER_URL']}/${name}/index.html`
-  // 生产：renderer 打到 out/renderer/{name}/index.html，main 在 out/main，路径相对
   return pathToFileURL(join(__dirname, '..', 'renderer', name, 'index.html')).toString()
 }
 
 function preloadPath(name: RendererName): string {
-  // electron-vite 输出为 ESM（.mjs）；main 进程位于 out/main，preload 在 out/preload
   return join(__dirname, '..', 'preload', `${name}.mjs`)
 }
+
+const HUD_WIDTH = 304
+const HUD_HEIGHT = 52
+const HUD_BOTTOM_GAP = 72
 
 export interface AppWindows {
   audio: BrowserWindow
@@ -48,31 +52,17 @@ export function createAllWindows(): AppWindows {
       preload: preloadPath('audio'),
     },
   })
+  audio.loadURL(rendererURL('audio'))
   if (isDev) {
-    // 先挂监听再 loadURL，确保初始加载阶段的 console / 错误都能被捕获
     audio.webContents.on('console-message', (e) => {
       console.info(`[audio-renderer] ${e.message}`)
     })
-    audio.webContents.on('did-fail-load', (_e, code, desc, url) => {
-      console.error(`[audio-renderer] did-fail-load ${code} ${desc} url=${url}`)
-    })
-    audio.webContents.on('render-process-gone', (_e, details) => {
-      console.error(`[audio-renderer] render-process-gone`, details)
-    })
-    audio.webContents.openDevTools({ mode: 'detach' })
   }
-  audio.loadURL(rendererURL('audio'))
 
-  // HUD：M2 阶段视觉占位，bottom-center 定位、无边框、透明背景
-  // 真正的 panel / focusable:false / always-on-top screen-saver 在 M10 落地
-  const primary = screen.getPrimaryDisplay().workArea
-  const hudWidth = 304
-  const hudHeight = 52
   const hud = new BrowserWindow({
-    width: hudWidth,
-    height: hudHeight,
-    x: primary.x + Math.round((primary.width - hudWidth) / 2),
-    y: primary.y + primary.height - hudHeight - 72,
+    width: HUD_WIDTH,
+    height: HUD_HEIGHT,
+    show: false, // orchestrator 在 START_RECORDING 后 50ms 才 show
     frame: false,
     transparent: true,
     resizable: false,
@@ -82,14 +72,23 @@ export function createAllWindows(): AppWindows {
     fullscreenable: false,
     skipTaskbar: true,
     hasShadow: false,
+    focusable: false, // 关键：HUD 浮窗绝不抢前台 app 焦点
     alwaysOnTop: true,
+    ...(process.platform === 'darwin' ? { type: 'panel' as const } : {}),
     webPreferences: {
       sandbox: false,
       contextIsolation: true,
       preload: preloadPath('hud'),
     },
   })
+  hud.setAlwaysOnTop(true, 'screen-saver')
+  hud.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   hud.loadURL(rendererURL('hud'))
+  if (isDev) {
+    hud.webContents.on('console-message', (e) => {
+      console.info(`[hud-renderer] ${e.message}`)
+    })
+  }
 
   const settings = new BrowserWindow({
     width: 880,
@@ -125,4 +124,31 @@ export function createAllWindows(): AppWindows {
 
   windows = { audio, hud, settings, onboarding }
   return windows
+}
+
+/**
+ * 把 HUD 定位到鼠标所在屏幕的底部居中，调 showInactive 不抢焦点。
+ * 多显示器时跟随 active screen。
+ */
+export function showHudOnActiveScreen(): void {
+  const w = windows?.hud
+  if (!w || w.isDestroyed()) return
+  const cursor = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursor)
+  const wa = display.workArea
+  const size = w.getSize()
+  const width = size[0] ?? HUD_WIDTH
+  const height = size[1] ?? HUD_HEIGHT
+  w.setPosition(
+    wa.x + Math.round((wa.width - width) / 2),
+    wa.y + wa.height - height - HUD_BOTTOM_GAP,
+  )
+  // showInactive 显示但不激活——不会从前台 app 抢走焦点
+  w.showInactive()
+}
+
+export function hideHudWindow(): void {
+  const w = windows?.hud
+  if (!w || w.isDestroyed()) return
+  w.hide()
 }

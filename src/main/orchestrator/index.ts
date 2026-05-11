@@ -26,6 +26,10 @@ export interface OrchestratorDeps {
   getDoubaoConfig(): DoubaoProviderConfig | null
   getAudioWebContents(): WebContents | undefined
   getHudWebContents(): WebContents | undefined
+  /** showInactive 把 HUD BrowserWindow 显示到 active screen，但不抢焦点 */
+  showHudWindow(): void
+  /** hide 把 HUD BrowserWindow 完全隐藏（OS 级，比单纯 hud:hide IPC 更彻底） */
+  hideHudWindow(): void
   /** session 终止时回调 hotkey FSM 派发 SESSION_DONE，让其从 processing/canceling 回 idle */
   notifyHotkeyDone(): void
 }
@@ -33,12 +37,16 @@ export interface OrchestratorDeps {
 type State = 'idle' | 'recording' | 'processing' | 'pasting' | 'error'
 
 const HUD_ERROR_LINGER_MS = 2000
+/** 显示防抖：按键按下后 N ms 才显示 HUD，避免误触/极短按导致 HUD 闪一下 */
+const HUD_SHOW_DEBOUNCE_MS = 50
 
 export class SessionOrchestrator {
   private state: State = 'idle'
   private provider: ASRProvider | null = null
   private cancelled = false
   private sessionStartMs = 0
+  private hudShowTimer: ReturnType<typeof setTimeout> | null = null
+  private hudShown = false
 
   constructor(private readonly deps: OrchestratorDeps) {}
 
@@ -98,8 +106,9 @@ export class SessionOrchestrator {
     this.cancelled = false
     this.sessionStartMs = Date.now()
 
-    // 通知 HUD + audio renderer
+    // 通知 HUD（IPC + 50ms 防抖后 BrowserWindow show）+ audio renderer
     this.deps.getHudWebContents()?.send(Channels.HUD_SHOW, { state: 'recording' })
+    this.scheduleHudShow()
     this.broadcastSessionState()
     this.deps.getAudioWebContents()?.send(Channels.AUDIO_START, { deviceId: null })
 
@@ -136,6 +145,7 @@ export class SessionOrchestrator {
     this.state = 'processing'
     this.deps.getAudioWebContents()?.send(Channels.AUDIO_STOP)
     this.deps.getHudWebContents()?.send(Channels.HUD_SHOW, { state: 'processing' })
+    this.ensureHudShown()
     this.broadcastSessionState()
 
     try {
@@ -151,7 +161,7 @@ export class SessionOrchestrator {
     this.deps.getAudioWebContents()?.send(Channels.AUDIO_ABORT)
     this.provider?.abort()
     this.provider = null
-    this.deps.getHudWebContents()?.send(Channels.HUD_HIDE)
+    this.hideHud()
     this.state = 'idle'
     this.broadcastSessionState()
     this.deps.notifyHotkeyDone()
@@ -183,7 +193,7 @@ export class SessionOrchestrator {
       console.warn('[orchestrator] nativePaste.pasteText failed:', err)
     }
 
-    this.deps.getHudWebContents()?.send(Channels.HUD_HIDE)
+    this.hideHud()
     this.provider = null
     this.state = 'idle'
     this.broadcastSessionState()
@@ -205,16 +215,54 @@ export class SessionOrchestrator {
       message: err.message,
     })
     this.deps.getHudWebContents()?.send(Channels.HUD_SHOW, { state: 'error' })
+    this.ensureHudShown()
     this.broadcastSessionState()
     this.deps.getAudioWebContents()?.send(Channels.AUDIO_ABORT)
 
     setTimeout(() => {
       if (this.state === 'error') {
-        this.deps.getHudWebContents()?.send(Channels.HUD_HIDE)
+        this.hideHud()
         this.state = 'idle'
         this.broadcastSessionState()
       }
     }, HUD_ERROR_LINGER_MS)
+  }
+
+  /* ───── HUD show/hide helpers ───── */
+
+  private scheduleHudShow(): void {
+    this.cancelHudShowTimer()
+    this.hudShowTimer = setTimeout(() => {
+      this.hudShowTimer = null
+      // 期间被 abort 掉了就不再显示
+      if (this.cancelled || this.state === 'idle') return
+      this.deps.showHudWindow()
+      this.hudShown = true
+    }, HUD_SHOW_DEBOUNCE_MS)
+  }
+
+  private ensureHudShown(): void {
+    this.cancelHudShowTimer()
+    if (!this.hudShown) {
+      this.deps.showHudWindow()
+      this.hudShown = true
+    }
+  }
+
+  private hideHud(): void {
+    this.cancelHudShowTimer()
+    this.deps.getHudWebContents()?.send(Channels.HUD_HIDE)
+    if (this.hudShown) {
+      this.deps.hideHudWindow()
+      this.hudShown = false
+    }
+  }
+
+  private cancelHudShowTimer(): void {
+    if (this.hudShowTimer !== null) {
+      clearTimeout(this.hudShowTimer)
+      this.hudShowTimer = null
+    }
   }
 
   private mapErrorCode(
