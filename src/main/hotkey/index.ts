@@ -24,16 +24,37 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
 
   fsm = createHotkeyFSM()
 
+  // M5 调试期：记录按下时刻以便日志里打出按住时长
+  let pressDownTs: number | null = null
+
+  /**
+   * M5 stub：FSM 发出 COMMIT_RECORDING / ABORT_CANCEL 后会进 processing/canceling 态，
+   * 等待 SESSION_DONE 才返回 idle。M9 orchestrator 写好之前没人发 SESSION_DONE，
+   * 这里立即 self-loop 一下让 FSM 解锁，方便手测连续按键。
+   */
+  function selfLoopDoneIfNeeded(action: ReturnType<HotkeyFSM['send']>): void {
+    if (action === 'COMMIT_RECORDING' || action === 'ABORT_CANCEL') {
+      const next = fsm!.send({ type: 'SESSION_DONE' })
+      if (next) console.info(`[hotkey] ${next} (M5 stub)`)
+    }
+  }
+
   uIOhook.on('keydown', (e) => {
     if (e.keycode !== UiohookKey.AltRight) return
-    const action = fsm!.send({ type: 'KEY_DOWN', ts: Date.now() })
+    const ts = Date.now()
+    pressDownTs ??= ts
+    const action = fsm!.send({ type: 'KEY_DOWN', ts })
     if (action) console.info(`[hotkey] ${action}`)
   })
 
   uIOhook.on('keyup', (e) => {
     if (e.keycode !== UiohookKey.AltRight) return
-    const action = fsm!.send({ type: 'KEY_UP', ts: Date.now() })
-    if (action) console.info(`[hotkey] ${action}`)
+    const ts = Date.now()
+    const heldMs = pressDownTs !== null ? ts - pressDownTs : -1
+    pressDownTs = null
+    const action = fsm!.send({ type: 'KEY_UP', ts })
+    if (action) console.info(`[hotkey] ${action} (held ${heldMs}ms)`)
+    selfLoopDoneIfNeeded(action)
   })
 
   try {
