@@ -1,4 +1,4 @@
-// uiohook 全局键盘监听 → 过滤右 Option/右 Alt → 喂 HotkeyFSM
+// uiohook 全局键盘监听 → 过滤右 Option/右 Alt → 喂 HotkeyFSM → 通知 orchestrator
 //
 // 副作用层；纯逻辑见 fsm.ts。
 //
@@ -7,62 +7,35 @@
 //   - Windows: rawcode 0xA5 (VK_RMENU)
 //
 // Accessibility 未授权时 uIOhook.start() 会抛异常 —— try-catch 兜底，不让 app 起不来。
-// M11+ 在设置面板检测权限状态时会重启 listener。
 
 import { UiohookKey, uIOhook } from 'uiohook-napi'
-import { Channels } from '@shared/ipc/channels.js'
-import { getAppWindows } from '../windows.js'
-import { createHotkeyFSM, type HotkeyFSM, type HotkeyAction } from './fsm.js'
+import { createHotkeyFSM, type HotkeyAction, type HotkeyFSM } from './fsm.js'
 
 let started = false
 let fsm: HotkeyFSM | null = null
+let actionListener: ((action: HotkeyAction) => void) | null = null
 
 /**
  * 启动全局键盘监听。Accessibility 未授权时打 warn 但不 throw，
  * 让 app 主体能继续 boot；上层可在权限授予后重试 start()。
+ *
+ * @param onAction 每当 FSM 派发非 null 的 action 时调用一次（START_RECORDING /
+ *                 COMMIT_RECORDING / ABORT_SHORT / ABORT_CANCEL / DONE）
  */
-export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
-  if (started && fsm) return { fsm, ok: true }
+export function startHotkeyListener(onAction: (action: HotkeyAction) => void): {
+  fsm: HotkeyFSM
+  ok: boolean
+} {
+  if (started && fsm) {
+    actionListener = onAction
+    return { fsm, ok: true }
+  }
 
   fsm = createHotkeyFSM()
+  actionListener = onAction
 
-  // M5 调试期：记录按下时刻以便日志里打出按住时长
+  // 调试用：记录按下时刻以便日志里打出按住时长（M14 menubar/tray 上线后或可裁掉）
   let pressDownTs: number | null = null
-
-  /**
-   * M5/M6 stub：把 FSM action 翻成 audio renderer 的 IPC 命令。
-   * M9 orchestrator 接管后这层会被替换为：FSM → orchestrator → audio + provider + paste 编排。
-   */
-  function bridgeToAudio(action: HotkeyAction): void {
-    const audio = getAppWindows()?.audio
-    if (!audio) return
-    switch (action) {
-      case 'START_RECORDING':
-        audio.webContents.send(Channels.AUDIO_START, { deviceId: null })
-        break
-      case 'COMMIT_RECORDING':
-      case 'ABORT_SHORT':
-        audio.webContents.send(Channels.AUDIO_STOP)
-        break
-      case 'ABORT_CANCEL':
-        audio.webContents.send(Channels.AUDIO_ABORT)
-        break
-      case 'DONE':
-        break
-    }
-  }
-
-  /**
-   * M5 stub：FSM 发出 COMMIT_RECORDING / ABORT_CANCEL 后会进 processing/canceling 态，
-   * 等待 SESSION_DONE 才返回 idle。M9 orchestrator 写好之前没人发 SESSION_DONE，
-   * 这里立即 self-loop 一下让 FSM 解锁，方便手测连续按键。
-   */
-  function selfLoopDoneIfNeeded(action: ReturnType<HotkeyFSM['send']>): void {
-    if (action === 'COMMIT_RECORDING' || action === 'ABORT_CANCEL') {
-      const next = fsm!.send({ type: 'SESSION_DONE' })
-      if (next) console.info(`[hotkey] ${next} (M5 stub)`)
-    }
-  }
 
   uIOhook.on('keydown', (e) => {
     if (e.keycode !== UiohookKey.AltRight) return
@@ -71,7 +44,7 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
     const action = fsm!.send({ type: 'KEY_DOWN', ts })
     if (action) {
       console.info(`[hotkey] ${action}`)
-      bridgeToAudio(action)
+      actionListener?.(action)
     }
   })
 
@@ -83,9 +56,8 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
     const action = fsm!.send({ type: 'KEY_UP', ts })
     if (action) {
       console.info(`[hotkey] ${action} (held ${heldMs}ms)`)
-      bridgeToAudio(action)
+      actionListener?.(action)
     }
-    selfLoopDoneIfNeeded(action)
   })
 
   try {
@@ -99,6 +71,19 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
       err,
     )
     return { fsm, ok: false }
+  }
+}
+
+/**
+ * orchestrator 在 session 结束（COMMIT 完成 / ABORT 完成 / ERROR 处理完）时调用，
+ * 让 FSM 从 processing/canceling 态回到 idle。
+ */
+export function dispatchSessionDone(): void {
+  if (!fsm) return
+  const action = fsm.send({ type: 'SESSION_DONE' })
+  if (action) {
+    console.info(`[hotkey] ${action}`)
+    actionListener?.(action)
   }
 }
 
