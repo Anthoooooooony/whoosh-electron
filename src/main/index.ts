@@ -5,12 +5,12 @@
 //   - permission handler 允许 media（getUserMedia）
 //   - 创建四个 BrowserWindow
 //   - 初始化 SessionOrchestrator + 注册 IPC handler + 启动 hotkey listener
-//   - dev 模式从 .env 读豆包凭据；M11 会改为从 settings store
+//   - 从 store + safeStorage 读豆包凭据；`.env` 仍作 dev override 兜底
 
 import { app, session } from 'electron'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { DoubaoProviderConfig } from '@providers/doubao/index.js'
+import { DoubaoProvider, type DoubaoProviderConfig } from '@providers/doubao/index.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { SessionOrchestrator } from './orchestrator/index.js'
 import {
@@ -20,8 +20,9 @@ import {
   stopHotkeyListener,
 } from './hotkey/index.js'
 import { createAllWindows, getAppWindows, hideHudWindow, showHudOnActiveScreen } from './windows.js'
+import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
 
-/* ───── dev-mode .env 读取（M11 settings 上线后这部分用 store 替代） ───── */
+/* ───── dev .env override（无 .env 则走 store） ───── */
 
 function loadDotEnv(): Record<string, string> {
   const envPath = join(process.cwd(), '.env')
@@ -49,7 +50,7 @@ function loadDotEnv(): Record<string, string> {
   }
 }
 
-function buildDoubaoConfigFromEnv(env: Record<string, string>): DoubaoProviderConfig | null {
+function buildDoubaoFromEnv(env: Record<string, string>): DoubaoProviderConfig | null {
   const apiKey = env['DOUBAO_API_KEY']
   const appKey = env['DOUBAO_APP_KEY']
   const accessKey = env['DOUBAO_ACCESS_KEY']
@@ -66,6 +67,44 @@ function buildDoubaoConfigFromEnv(env: Record<string, string>): DoubaoProviderCo
   return config
 }
 
+function buildDoubaoFromStore(): DoubaoProviderConfig | null {
+  const cfg = getConfig()
+  const providerCfg = cfg.providers['doubao'] ?? {}
+  const apiKey = getApiKey('doubao')
+  if (!apiKey) return null
+
+  const resourceId =
+    typeof providerCfg['resourceId'] === 'string'
+      ? (providerCfg['resourceId'] as string)
+      : undefined
+  const endpointKey =
+    typeof providerCfg['endpointKey'] === 'string'
+      ? (providerCfg['endpointKey'] as DoubaoProviderConfig['endpointKey'])
+      : undefined
+
+  const request: NonNullable<DoubaoProviderConfig['request']> = {}
+  for (const k of [
+    'language',
+    'enable_punc',
+    'enable_itn',
+    'enable_ddc',
+    'show_utterances',
+  ] as const) {
+    const v = providerCfg[k]
+    if (v !== undefined) request[k] = v as never
+  }
+
+  const out: DoubaoProviderConfig = { auth: { mode: 'new', apiKey } }
+  if (resourceId) out.resourceId = resourceId
+  if (endpointKey) out.endpointKey = endpointKey
+  if (Object.keys(request).length > 0) out.request = request
+  return out
+}
+
+function buildDoubaoFromStoreOrEnv(env: Record<string, string>): DoubaoProviderConfig | null {
+  return buildDoubaoFromEnv(env) ?? buildDoubaoFromStore()
+}
+
 /* ───── lifecycle ───── */
 
 const gotLock = app.requestSingleInstanceLock()
@@ -73,28 +112,23 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    // M11 落地：把 settings 窗口 show + focus
+    getAppWindows()?.settings.show()
+    getAppWindows()?.settings.focus()
   })
 
   app.whenReady().then(() => {
-    // 允许 audio renderer 调 getUserMedia（macOS 系统级 mic 权限另外谈）
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
       callback(permission === 'media')
     })
 
     createAllWindows()
 
-    // dev 凭据
     const env = loadDotEnv()
-    const doubaoConfig: DoubaoProviderConfig | null = buildDoubaoConfigFromEnv(env)
-    if (doubaoConfig) {
-      console.info('[main] Doubao config loaded from .env')
-    } else {
-      console.warn('[main] no Doubao credentials configured; sessions will surface AUTH error')
-    }
+    const hasEnvCreds = !!buildDoubaoFromEnv(env)
+    if (hasEnvCreds) console.info('[main] Doubao credentials loaded from .env (dev override)')
 
     const orchestrator = new SessionOrchestrator({
-      getDoubaoConfig: () => doubaoConfig,
+      getDoubaoConfig: () => buildDoubaoFromStoreOrEnv(env),
       getAudioWebContents: () => getAppWindows()?.audio.webContents,
       getHudWebContents: () => getAppWindows()?.hud.webContents,
       showHudWindow: () => showHudOnActiveScreen(),
@@ -105,6 +139,34 @@ if (!gotLock) {
     registerIpcHandlers({
       onAudioChunk: (chunk) => orchestrator.handleAudioChunk(chunk),
       onHudCancel: () => dispatchCancelClick(),
+      getConfig: () => getConfig(),
+      setConfig: (patch) => setConfig(patch),
+      getApiKey: (id) => getApiKey(id),
+      setApiKey: (id, key) => setApiKey(id, key),
+      testProviderConnection: async (req) => {
+        if (req.providerId !== 'doubao') {
+          return { ok: false, error: `unknown provider ${req.providerId}` }
+        }
+        // 用临时 provider 跑一次握手；不发音频，建连成功即认为可用
+        const creds = req.credentials as Record<string, unknown>
+        const apiKey = typeof creds['apiKey'] === 'string' ? creds['apiKey'] : undefined
+        const resourceId = typeof creds['resourceId'] === 'string' ? creds['resourceId'] : undefined
+        if (!apiKey) return { ok: false, error: '缺少 apiKey 字段' }
+
+        const testCfg: DoubaoProviderConfig = { auth: { mode: 'new', apiKey } }
+        if (resourceId) testCfg.resourceId = resourceId
+
+        const provider = new DoubaoProvider(testCfg)
+        const t0 = Date.now()
+        try {
+          await provider.start({ sampleRate: 16000, encoding: 'pcm_s16le' })
+          provider.abort()
+          return { ok: true, latencyMs: Date.now() - t0 }
+        } catch (err) {
+          provider.abort()
+          return { ok: false, error: err instanceof Error ? err.message : String(err) }
+        }
+      },
     })
 
     startHotkeyListener((action) => orchestrator.handleHotkeyAction(action))

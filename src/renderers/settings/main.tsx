@@ -1,58 +1,673 @@
-import { useEffect, useState } from 'react'
+// Settings renderer · M11
+//
+// 5 个 section: Setup / Provider / Behavior / Logs & Privacy / About
+// 通过 window.ipc.invoke 读写 main 进程的 store；M11 阶段不做 schema-driven form，
+// 每个 section 手写组件即可。
+
+import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-// M2 占位：完整的 sidebar + 5 个 section 由 M11 落地
-// M3 烟囱：调用 settings:get 验证 IPC 通路
-function App(): React.ReactElement {
-  const [ipcResult, setIpcResult] = useState<string>('（loading）')
+type SectionKey = 'setup' | 'provider' | 'behavior' | 'logs' | 'about'
 
+interface AppConfig {
+  audio: { inputDeviceId: string | null; inputDeviceLabel?: string }
+  providers: Record<string, Record<string, unknown>>
+  currentProviderId: 'doubao'
+  behavior: { showHudWhenRecording: boolean; openAtLogin: boolean }
+  logging: { verbose: boolean }
+  ui: { locale: 'zh-CN' | 'en' }
+  onboarding: { completedSteps: string[]; done: boolean }
+}
+
+interface DeviceInfo {
+  deviceId: string
+  label: string
+}
+
+function App(): React.ReactElement {
+  const [section, setSection] = useState<SectionKey>('setup')
+  const [config, setConfig] = useState<AppConfig | null>(null)
+  const [apiKey, setApiKeyState] = useState<string>('')
+  const [devices, setDevices] = useState<DeviceInfo[]>([])
+
+  /* 初始拉配置 */
   useEffect(() => {
-    void (async (): Promise<void> => {
-      if (!window.ipc) {
-        setIpcResult('window.ipc undefined —— preload 未注入')
-        return
-      }
-      try {
-        const cfg = await window.ipc.invoke('settings:get')
-        setIpcResult(`settings:get → ${JSON.stringify(cfg, null, 2)}`)
-      } catch (err) {
-        setIpcResult(`error: ${String(err)}`)
-      }
+    void (async () => {
+      const cfg = (await window.ipc.invoke('settings:get')) as AppConfig
+      setConfig(cfg)
+      const { key } = await window.ipc.invoke('settings:get-apikey', { providerId: 'doubao' })
+      setApiKeyState(key ?? '')
     })()
   }, [])
 
+  /* 拉麦克风设备列表 */
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices()
+      const audioInputs = list
+        .filter((d) => d.kind === 'audioinput')
+        .map((d) => ({ deviceId: d.deviceId, label: d.label || '未命名设备' }))
+      setDevices(audioInputs)
+    } catch (err) {
+      console.error('[settings] enumerateDevices failed', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshDevices()
+    navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
+  }, [refreshDevices])
+
+  const updateConfig = useCallback(async (patch: Partial<AppConfig>) => {
+    const next = (await window.ipc.invoke('settings:set', patch)) as AppConfig
+    setConfig(next)
+  }, [])
+
+  const updateProviderConfig = useCallback(
+    async (providerPatch: Record<string, unknown>) => {
+      if (!config) return
+      const merged = { ...(config.providers['doubao'] ?? {}), ...providerPatch }
+      await updateConfig({ providers: { ...config.providers, doubao: merged } })
+    },
+    [config, updateConfig],
+  )
+
+  if (!config) {
+    return <div style={{ padding: 40, color: 'var(--text-muted)' }}>加载中…</div>
+  }
+
   return (
-    <div
-      style={{
-        fontFamily: '"Noto Sans SC", system-ui, sans-serif',
-        background: '#F5F2EB',
-        color: '#15130f',
-        minHeight: '100vh',
-        padding: '48px 56px',
-      }}
-    >
-      <h1 style={{ fontFamily: '"Noto Serif SC", serif', fontWeight: 600, margin: 0 }}>
-        whoosh · 偏好设置
-      </h1>
-      <p style={{ marginTop: 12, color: '#8a8478' }}>M11 阶段会替换为完整的 5 个 section 面板。</p>
-      <pre
-        style={{
-          marginTop: 24,
-          padding: 16,
-          background: '#FFFFFF',
-          border: '1px solid #E2DCCD',
-          borderRadius: 8,
-          fontFamily: '"IBM Plex Mono", monospace',
-          fontSize: 11,
-          color: '#4A463F',
-          whiteSpace: 'pre-wrap',
-        }}
-      >
-        {ipcResult}
-      </pre>
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-name">
+            whoosh<em>·</em>
+          </div>
+          <div className="sidebar-brand-ver mono">v0.1.0</div>
+        </div>
+        <div className="sidebar-section">配置</div>
+        {(
+          [
+            ['setup', '基础'],
+            ['provider', '服务商'],
+            ['behavior', '行为'],
+            ['logs', '日志与隐私'],
+            ['about', '关于'],
+          ] as const
+        ).map(([key, label]) => (
+          <div
+            key={key}
+            className={`sidebar-item${section === key ? ' active' : ''}`}
+            onClick={() => setSection(key)}
+          >
+            {label}
+          </div>
+        ))}
+        <div className="sidebar-footer">
+          <span className="dot-listen" />
+          <span>监听中 · 右 ⌥</span>
+        </div>
+      </aside>
+
+      <main className="content">
+        {section === 'setup' && (
+          <SetupPane
+            config={config}
+            devices={devices}
+            apiKey={apiKey}
+            onApiKeyChange={setApiKeyState}
+            updateConfig={updateConfig}
+            refreshDevices={refreshDevices}
+          />
+        )}
+        {section === 'provider' && (
+          <ProviderPane
+            providerCfg={config.providers['doubao'] ?? {}}
+            updateProviderConfig={updateProviderConfig}
+          />
+        )}
+        {section === 'behavior' && <BehaviorPane config={config} updateConfig={updateConfig} />}
+        {section === 'logs' && <LogsPane config={config} updateConfig={updateConfig} />}
+        {section === 'about' && <AboutPane />}
+      </main>
     </div>
+  )
+}
+
+/* ───────────────────────────────────────────────────────────
+   Setup pane —— mic 设备、API 凭据、权限状态
+   ─────────────────────────────────────────────────────────── */
+interface SetupPaneProps {
+  config: AppConfig
+  devices: DeviceInfo[]
+  apiKey: string
+  onApiKeyChange: (key: string) => void
+  updateConfig: (patch: Partial<AppConfig>) => Promise<void>
+  refreshDevices: () => Promise<void>
+}
+
+function SetupPane(props: SetupPaneProps): React.ReactElement {
+  const { config, devices, apiKey, onApiKeyChange, updateConfig, refreshDevices } = props
+  const [resourceId, setResourceId] = useState<string>(
+    (config.providers['doubao']?.['resourceId'] as string) ?? 'volc.seedasr.sauc.duration',
+  )
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{
+    ok: boolean
+    msg: string
+    latency?: number
+  } | null>(null)
+
+  const saveApiKey = useCallback(async () => {
+    await window.ipc.invoke('settings:set-apikey', { providerId: 'doubao', key: apiKey })
+    await updateConfig({
+      providers: {
+        ...config.providers,
+        doubao: { ...(config.providers['doubao'] ?? {}), resourceId },
+      },
+    })
+  }, [apiKey, resourceId, config, updateConfig])
+
+  const testConnection = useCallback(async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await window.ipc.invoke('provider:test-connection', {
+        providerId: 'doubao',
+        credentials: { apiKey, resourceId },
+      })
+      const result = {
+        ok: res.ok,
+        msg: res.ok ? '连接成功' : (res.error ?? 'unknown error'),
+      } as { ok: boolean; msg: string; latency?: number }
+      if (res.latencyMs !== undefined) result.latency = res.latencyMs
+      setTestResult(result)
+      if (res.ok) await saveApiKey()
+    } catch (err) {
+      setTestResult({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setTesting(false)
+    }
+  }, [apiKey, resourceId, saveApiKey])
+
+  return (
+    <>
+      <div className="pane-header">
+        <div className="pane-eyebrow">— 配置 / 01</div>
+        <h3 className="pane-title">基础</h3>
+        <p className="pane-desc">麦克风设备、API 凭据与系统权限状态。</p>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">麦克风</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">输入设备</span>
+              <span className="row-hint">默认跟随系统当前选择的输入设备。</span>
+            </div>
+            <div className="row-control">
+              <select
+                className="select-native"
+                value={config.audio.inputDeviceId ?? ''}
+                onChange={(e) => {
+                  const id = e.target.value || null
+                  const label = devices.find((d) => d.deviceId === id)?.label
+                  const audio = { inputDeviceId: id, ...(label ? { inputDeviceLabel: label } : {}) }
+                  void updateConfig({ audio })
+                }}
+              >
+                <option value="">系统默认</option>
+                {devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <button className="btn-accent" onClick={() => void refreshDevices()}>
+                刷新
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">API 凭据 · 豆包</h4>
+        <div className="card">
+          <div className="field-stack">
+            <div className="field">
+              <label className="field-label">API Key</label>
+              <input
+                className="input field-input"
+                type="password"
+                placeholder="新版控制台 X-Api-Key（UUID 格式）"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label">Resource ID</label>
+              <select
+                className="select-native field-input"
+                value={resourceId}
+                onChange={(e) => setResourceId(e.target.value)}
+              >
+                <option value="volc.seedasr.sauc.duration">
+                  v2 小时版 · volc.seedasr.sauc.duration
+                </option>
+                <option value="volc.seedasr.sauc.concurrent">
+                  v2 并发版 · volc.seedasr.sauc.concurrent
+                </option>
+                <option value="volc.bigasr.sauc.duration">
+                  v1 小时版 · volc.bigasr.sauc.duration
+                </option>
+                <option value="volc.bigasr.sauc.concurrent">
+                  v1 并发版 · volc.bigasr.sauc.concurrent
+                </option>
+              </select>
+            </div>
+          </div>
+          <div className="test-bar">
+            <div>
+              {testResult ? (
+                testResult.ok ? (
+                  <>
+                    <span className="status-pill status-success">已连接</span>
+                    <span style={{ marginLeft: 10, color: 'var(--text-2)' }}>
+                      {testResult.msg}
+                      {testResult.latency !== undefined ? ` · ${testResult.latency}ms` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="status-pill status-error">失败</span>
+                    <span style={{ marginLeft: 10, color: 'var(--error)' }}>{testResult.msg}</span>
+                  </>
+                )
+              ) : (
+                <span style={{ color: 'var(--text-muted)' }}>
+                  填好凭据后点 Test Connection 验证 + 保存
+                </span>
+              )}
+            </div>
+            <button
+              className="btn btn-primary"
+              disabled={testing || !apiKey}
+              onClick={() => void testConnection()}
+            >
+              {testing ? '测试中…' : 'Test Connection'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────────────────────────────────────────
+   Provider pane —— 豆包识别参数
+   ─────────────────────────────────────────────────────────── */
+interface ProviderPaneProps {
+  providerCfg: Record<string, unknown>
+  updateProviderConfig: (patch: Record<string, unknown>) => Promise<void>
+}
+
+function ProviderPane({
+  providerCfg,
+  updateProviderConfig,
+}: ProviderPaneProps): React.ReactElement {
+  const language = (providerCfg['language'] as string) ?? 'zh-CN'
+  const endpointKey = (providerCfg['endpointKey'] as string) ?? 'bigmodel_async'
+  const enableItn = providerCfg['enable_itn'] !== false
+  const enablePunc = providerCfg['enable_punc'] !== false
+  const enableDdc = providerCfg['enable_ddc'] === true
+  const showUtterances = providerCfg['show_utterances'] === true
+
+  return (
+    <>
+      <div className="pane-header">
+        <div className="pane-eyebrow">— 配置 / 02</div>
+        <h3 className="pane-title">服务商 · 豆包 Seed</h3>
+        <p className="pane-desc">ASR 服务商相关设置。</p>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">识别</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">识别语言</span>
+              <span className="row-hint">
+                模型原生支持中英混合 code-switching，zh-CN 已覆盖大多数日常场景。
+              </span>
+            </div>
+            <div className="row-control">
+              <select
+                className="select-native"
+                value={language}
+                onChange={(e) => void updateProviderConfig({ language: e.target.value })}
+              >
+                <option value="zh-CN">zh-CN · 中文（含中英混合）</option>
+                <option value="en-US">en-US · 英文</option>
+                <option value="ja-JP">ja-JP · 日语</option>
+                <option value="ko-KR">ko-KR · 韩语</option>
+                <option value="yue-CN">yue-CN · 粤语</option>
+              </select>
+            </div>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">Endpoint 模式</span>
+              <span className="row-hint">bigmodel_async = 双向流式优化版（推荐）</span>
+            </div>
+            <div className="row-control">
+              <select
+                className="select-native"
+                value={endpointKey}
+                onChange={(e) => void updateProviderConfig({ endpointKey: e.target.value })}
+              >
+                <option value="bigmodel_async">bigmodel_async（推荐）</option>
+                <option value="bigmodel">bigmodel · 双向流式标准</option>
+                <option value="bigmodel_nostream">bigmodel_nostream · 流式输入</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">后处理</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">文本逆归一化（ITN）</span>
+              <span className="row-hint">"一百二十三" → "123"</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={enableItn}
+                onClick={() => void updateProviderConfig({ enable_itn: !enableItn })}
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">自动标点</span>
+              <span className="row-hint">在语义边界自动插入「，。？！」</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={enablePunc}
+                onClick={() => void updateProviderConfig({ enable_punc: !enablePunc })}
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">语义顺滑（DDC）</span>
+              <span className="row-hint">删除"嗯""啊"等填充词，提升书面感</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={enableDdc}
+                onClick={() => void updateProviderConfig({ enable_ddc: !enableDdc })}
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">输出分句信息</span>
+              <span className="row-hint">仅 debug 时开启；上层 UI 不消费</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={showUtterances}
+                onClick={() => void updateProviderConfig({ show_utterances: !showUtterances })}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────────────────────────────────────────
+   Behavior pane —— 触发键 + 开机自启 + HUD 开关
+   ─────────────────────────────────────────────────────────── */
+interface BehaviorPaneProps {
+  config: AppConfig
+  updateConfig: (patch: Partial<AppConfig>) => Promise<void>
+}
+
+function BehaviorPane({ config, updateConfig }: BehaviorPaneProps): React.ReactElement {
+  return (
+    <>
+      <div className="pane-header">
+        <div className="pane-eyebrow">— 配置 / 03</div>
+        <h3 className="pane-title">行为</h3>
+        <p className="pane-desc">触发键与启动行为。</p>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">触发</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">快捷键</span>
+              <span className="row-hint">长按录音，松开完成。当前版本不支持自定义。</span>
+            </div>
+            <div className="row-control">
+              <span className="kbd">⌥</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                右 Option（macOS）/ 右 Alt（Windows）
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">启动</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">开机自启</span>
+              <span className="row-hint">系统启动时自动后台运行 whoosh。</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={config.behavior.openAtLogin}
+                onClick={() =>
+                  void updateConfig({
+                    behavior: {
+                      ...config.behavior,
+                      openAtLogin: !config.behavior.openAtLogin,
+                    },
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">录音时显示 HUD</span>
+              <span className="row-hint">关闭后录音过程将无任何屏幕反馈。</span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={config.behavior.showHudWhenRecording}
+                onClick={() =>
+                  void updateConfig({
+                    behavior: {
+                      ...config.behavior,
+                      showHudWhenRecording: !config.behavior.showHudWhenRecording,
+                    },
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────────────────────────────────────────
+   Logs & Privacy pane
+   ─────────────────────────────────────────────────────────── */
+interface LogsPaneProps {
+  config: AppConfig
+  updateConfig: (patch: Partial<AppConfig>) => Promise<void>
+}
+
+function LogsPane({ config, updateConfig }: LogsPaneProps): React.ReactElement {
+  return (
+    <>
+      <div className="pane-header">
+        <div className="pane-eyebrow">— 配置 / 04</div>
+        <h3 className="pane-title">日志与隐私</h3>
+        <p className="pane-desc">whoosh 不上传任何遥测、不上报崩溃。日志仅本地保存。</p>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">诊断</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">详细日志</span>
+              <span className="row-hint" style={{ color: 'var(--warn)' }}>
+                ⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。
+              </span>
+            </div>
+            <div className="row-control">
+              <span
+                className="toggle"
+                data-on={config.logging.verbose}
+                onClick={() =>
+                  void updateConfig({
+                    logging: { ...config.logging, verbose: !config.logging.verbose },
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="group">
+        <h4 className="group-title">隐私</h4>
+        <div className="card">
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">遥测</span>
+              <span className="row-hint">不会收集任何使用数据。</span>
+            </div>
+            <span className="status-pill status-success">已关闭</span>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">崩溃上报</span>
+              <span className="row-hint">无远程上报端点。报告 bug 时手动附上日志。</span>
+            </div>
+            <span className="status-pill status-success">已关闭</span>
+          </div>
+          <div className="row">
+            <div className="row-info">
+              <span className="row-label">剪贴板保护</span>
+              <span className="row-hint">
+                写入时附带 ConcealedType / TransientType 标记，不进剪贴板历史。
+              </span>
+            </div>
+            <span className="status-pill status-success">已启用</span>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────────────────────────────────────────
+   About pane
+   ─────────────────────────────────────────────────────────── */
+function AboutPane(): React.ReactElement {
+  const [checking, setChecking] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState<{
+    hasUpdate: boolean
+    version?: string
+    url?: string
+  } | null>(null)
+
+  const checkUpdate = useCallback(async () => {
+    setChecking(true)
+    try {
+      const res = await window.ipc.invoke('updater:check')
+      const info: { hasUpdate: boolean; version?: string; url?: string } = {
+        hasUpdate: res.hasUpdate,
+      }
+      if (res.version) info.version = res.version
+      if (res.url) info.url = res.url
+      setUpdateInfo(info)
+    } finally {
+      setChecking(false)
+    }
+  }, [])
+
+  return (
+    <>
+      <div className="pane-header">
+        <div className="pane-eyebrow">— 配置 / 05</div>
+        <h3 className="pane-title">关于</h3>
+        <p className="pane-desc">版本与更新检查。</p>
+      </div>
+
+      <div className="group">
+        <div className="card">
+          <div className="about-grid">
+            <span className="about-key">版本</span>
+            <span className="about-val mono">0.1.0 · macOS arm64</span>
+            <span className="about-key">源码</span>
+            <span className="about-val mono">
+              <a
+                href="https://github.com/Anthoooooooony/whoosh-electron"
+                onClick={(e) => {
+                  e.preventDefault()
+                  void window.ipc.send('permission:open-system-prefs', { pane: 'accessibility' })
+                  // 实际跳浏览器在 M15 用 shell.openExternal；此处占位
+                }}
+              >
+                github.com/Anthoooooooony/whoosh-electron
+              </a>
+            </span>
+            <span className="about-key">许可证</span>
+            <span className="about-val">私有 · 仅个人使用</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="group">
+        <button className="btn btn-primary" disabled={checking} onClick={() => void checkUpdate()}>
+          {checking ? '检查中…' : '检查更新'}
+        </button>
+        {updateInfo && (
+          <p style={{ marginTop: 10, fontSize: 13, color: 'var(--text-2)' }}>
+            {updateInfo.hasUpdate ? `有新版本 ${updateInfo.version ?? ''}` : '当前已是最新版本'}
+          </p>
+        )}
+      </div>
+    </>
   )
 }
 
 const root = document.getElementById('root')
 if (root) createRoot(root).render(<App />)
+console.info('[settings] renderer booted')
