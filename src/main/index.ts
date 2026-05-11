@@ -4,6 +4,7 @@
 
 import { app } from 'electron'
 import { createAllWindows } from './windows.js'
+import { registerIpcHandlers } from './ipc/index.js'
 
 // 单例锁；第二实例启动时唤起已有实例的主面板
 const gotLock = app.requestSingleInstanceLock()
@@ -15,6 +16,7 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    registerIpcHandlers()
     createAllWindows()
   })
 

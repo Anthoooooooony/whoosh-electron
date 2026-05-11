@@ -9,10 +9,17 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isDev = !!process.env['ELECTRON_RENDERER_URL']
 
-function rendererURL(name: 'audio' | 'hud' | 'settings' | 'onboarding'): string {
+type RendererName = 'audio' | 'hud' | 'settings' | 'onboarding'
+
+function rendererURL(name: RendererName): string {
   if (isDev) return `${process.env['ELECTRON_RENDERER_URL']}/src/renderers/${name}/index.html`
   // 生产：renderer 打到 out/renderer/{name}/index.html，main 在 out/main，路径相对
   return pathToFileURL(join(__dirname, '..', 'renderer', name, 'index.html')).toString()
+}
+
+function preloadPath(name: RendererName): string {
+  // electron-vite 输出为 ESM（.mjs）；main 进程位于 out/main，preload 在 out/preload
+  return join(__dirname, '..', 'preload', `${name}.mjs`)
 }
 
 export interface AppWindows {
@@ -28,7 +35,11 @@ export function createAllWindows(): AppWindows {
     height: 1,
     show: false,
     skipTaskbar: true,
-    webPreferences: { sandbox: false }, // M3 加 preload + contextIsolation
+    webPreferences: {
+      sandbox: false,
+      contextIsolation: true,
+      preload: preloadPath('audio'),
+    },
   })
   audio.loadURL(rendererURL('audio'))
 
@@ -52,7 +63,11 @@ export function createAllWindows(): AppWindows {
     skipTaskbar: true,
     hasShadow: false,
     alwaysOnTop: true,
-    webPreferences: { sandbox: false },
+    webPreferences: {
+      sandbox: false,
+      contextIsolation: true,
+      preload: preloadPath('hud'),
+    },
   })
   hud.loadURL(rendererURL('hud'))
 
@@ -62,9 +77,14 @@ export function createAllWindows(): AppWindows {
     show: true,
     title: 'whoosh — 偏好设置',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    webPreferences: { sandbox: false },
+    webPreferences: {
+      sandbox: false,
+      contextIsolation: true,
+      preload: preloadPath('settings'),
+    },
   })
   settings.loadURL(rendererURL('settings'))
+  if (isDev) settings.webContents.openDevTools({ mode: 'detach' })
 
   const onboarding = new BrowserWindow({
     width: 580,
@@ -75,7 +95,11 @@ export function createAllWindows(): AppWindows {
     minimizable: false,
     maximizable: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    webPreferences: { sandbox: false },
+    webPreferences: {
+      sandbox: false,
+      contextIsolation: true,
+      preload: preloadPath('onboarding'),
+    },
   })
   onboarding.loadURL(rendererURL('onboarding'))
 

@@ -23,7 +23,25 @@ export default defineConfig({
     },
   },
 
-  // preload 在 M3（IPC 框架）落地，M2 暂不配
+  preload: {
+    build: {
+      externalizeDeps: true,
+      rollupOptions: {
+        input: {
+          audio: resolve(rootDir, 'src/renderers/audio/preload.ts'),
+          hud: resolve(rootDir, 'src/renderers/hud/preload.ts'),
+          settings: resolve(rootDir, 'src/renderers/settings/preload.ts'),
+          onboarding: resolve(rootDir, 'src/renderers/onboarding/preload.ts'),
+        },
+      },
+      outDir: resolve(rootDir, 'out/preload'),
+    },
+    resolve: {
+      alias: {
+        '@shared': resolve(rootDir, 'src/shared'),
+      },
+    },
+  },
 
   renderer: {
     root: resolve(rootDir, 'src/renderers'),
