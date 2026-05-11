@@ -3,6 +3,8 @@
 // 在所有 renderer main.tsx 中可直接 `window.ipc.invoke(...)` / `window.ipc.send(...)` / `window.ipc.on(...)`
 // 并获得 IpcApi 的全套泛型类型推导
 
+/// <reference types="vite/client" />
+
 import type { IpcApi } from '@shared/ipc/types.js'
 
 declare global {
