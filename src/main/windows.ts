@@ -29,6 +29,12 @@ export interface AppWindows {
   onboarding: BrowserWindow
 }
 
+let windows: AppWindows | null = null
+
+export function getAppWindows(): AppWindows | null {
+  return windows
+}
+
 export function createAllWindows(): AppWindows {
   const audio = new BrowserWindow({
     width: 1,
@@ -103,5 +109,6 @@ export function createAllWindows(): AppWindows {
   })
   onboarding.loadURL(rendererURL('onboarding'))
 
-  return { audio, hud, settings, onboarding }
+  windows = { audio, hud, settings, onboarding }
+  return windows
 }

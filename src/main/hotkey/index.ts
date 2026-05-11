@@ -10,7 +10,9 @@
 // M11+ 在设置面板检测权限状态时会重启 listener。
 
 import { UiohookKey, uIOhook } from 'uiohook-napi'
-import { createHotkeyFSM, type HotkeyFSM } from './fsm.js'
+import { Channels } from '@shared/ipc/channels.js'
+import { getAppWindows } from '../windows.js'
+import { createHotkeyFSM, type HotkeyFSM, type HotkeyAction } from './fsm.js'
 
 let started = false
 let fsm: HotkeyFSM | null = null
@@ -26,6 +28,29 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
 
   // M5 调试期：记录按下时刻以便日志里打出按住时长
   let pressDownTs: number | null = null
+
+  /**
+   * M5/M6 stub：把 FSM action 翻成 audio renderer 的 IPC 命令。
+   * M9 orchestrator 接管后这层会被替换为：FSM → orchestrator → audio + provider + paste 编排。
+   */
+  function bridgeToAudio(action: HotkeyAction): void {
+    const audio = getAppWindows()?.audio
+    if (!audio) return
+    switch (action) {
+      case 'START_RECORDING':
+        audio.webContents.send(Channels.AUDIO_START, { deviceId: null })
+        break
+      case 'COMMIT_RECORDING':
+      case 'ABORT_SHORT':
+        audio.webContents.send(Channels.AUDIO_STOP)
+        break
+      case 'ABORT_CANCEL':
+        audio.webContents.send(Channels.AUDIO_ABORT)
+        break
+      case 'DONE':
+        break
+    }
+  }
 
   /**
    * M5 stub：FSM 发出 COMMIT_RECORDING / ABORT_CANCEL 后会进 processing/canceling 态，
@@ -44,7 +69,10 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
     const ts = Date.now()
     pressDownTs ??= ts
     const action = fsm!.send({ type: 'KEY_DOWN', ts })
-    if (action) console.info(`[hotkey] ${action}`)
+    if (action) {
+      console.info(`[hotkey] ${action}`)
+      bridgeToAudio(action)
+    }
   })
 
   uIOhook.on('keyup', (e) => {
@@ -53,7 +81,10 @@ export function startHotkeyListener(): { fsm: HotkeyFSM; ok: boolean } {
     const heldMs = pressDownTs !== null ? ts - pressDownTs : -1
     pressDownTs = null
     const action = fsm!.send({ type: 'KEY_UP', ts })
-    if (action) console.info(`[hotkey] ${action} (held ${heldMs}ms)`)
+    if (action) {
+      console.info(`[hotkey] ${action} (held ${heldMs}ms)`)
+      bridgeToAudio(action)
+    }
     selfLoopDoneIfNeeded(action)
   })
 
