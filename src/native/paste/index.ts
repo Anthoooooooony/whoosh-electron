@@ -24,27 +24,25 @@ interface NativeAddon {
 }
 
 function loadAddon(): NativeAddon {
-  // dev: electron-rebuild 输出到 src/native/paste/build/Release/paste.node
-  // dev 时 electron-vite 从项目根启动，process.cwd() 即项目根
-  const devPath = join(process.cwd(), 'src', 'native', 'paste', 'build', 'Release', 'paste.node')
-  try {
-    return require(devPath) as NativeAddon
-  } catch {
-    // 兜底：相对 main 输出目录（M16 生产打包改读 prebuilds）
-    const fallback = join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'src',
-      'native',
-      'paste',
-      'build',
-      'Release',
-      'paste.node',
-    )
-    return require(fallback) as NativeAddon
+  // 生产：electron-builder extraResources 把 .node 复制到 process.resourcesPath/paste.node
+  // dev: electron-rebuild 输出在 src/native/paste/build/Release/paste.node
+  const candidates: string[] = []
+  if (typeof process.resourcesPath === 'string' && process.resourcesPath.length > 0) {
+    candidates.push(join(process.resourcesPath, 'paste.node'))
   }
+  candidates.push(join(process.cwd(), 'src', 'native', 'paste', 'build', 'Release', 'paste.node'))
+  candidates.push(
+    join(__dirname, '..', '..', '..', 'src', 'native', 'paste', 'build', 'Release', 'paste.node'),
+  )
+  let lastErr: unknown
+  for (const p of candidates) {
+    try {
+      return require(p) as NativeAddon
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw new Error(`paste.node not found; tried: ${candidates.join(', ')}; last: ${String(lastErr)}`)
 }
 
 let cached: NativeAddon | null = null

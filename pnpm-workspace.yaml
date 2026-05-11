@@ -1,4 +1,7 @@
 allowBuilds:
+  electron-winstaller: true
+  '7zip-bin': true
+  dmg-license: true
   esbuild: true
   uiohook-napi: true
 

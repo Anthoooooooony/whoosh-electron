@@ -34,6 +34,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^42.0.1",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
@@ -70,5 +71,49 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "build": {
+    "appId": "com.mikaa.whoosh",
+    "productName": "whoosh",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "src/native/paste/build/Release/paste.node",
+        "to": "paste.node"
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "arm64"
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "LSUIElement": 1,
+        "NSMicrophoneUsageDescription": "whoosh needs microphone access to capture voice input for transcription."
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": "x64"
+        }
+      ]
+    },
+    "publish": null
   }
 }
