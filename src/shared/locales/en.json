@@ -1,0 +1,155 @@
+{
+  "brand": "whoosh",
+  "common": {
+    "loading": "Loading…",
+    "back": "Back",
+    "continue": "Continue",
+    "finish": "Finish",
+    "save": "Save",
+    "cancel": "Cancel",
+    "refresh": "Refresh",
+    "test": "Test"
+  },
+  "hud": {
+    "listening": "Listening…",
+    "processing": "Transcribing",
+    "cancel": "Cancel transcription",
+    "unknownError": "Error"
+  },
+  "settings": {
+    "title": "Preferences",
+    "sections": {
+      "setup": "Setup",
+      "provider": "Provider",
+      "behavior": "Behavior",
+      "logs": "Logs & Privacy",
+      "about": "About"
+    },
+    "footer": "Listening · Right ⌥",
+    "setup": {
+      "title": "Setup",
+      "desc": "Microphone, API credentials, and system permission status.",
+      "mic": {
+        "title": "Microphone",
+        "device": "Input device",
+        "deviceHint": "Follows the system default input device.",
+        "default": "System default"
+      },
+      "credentials": {
+        "title": "API Credentials · Doubao",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "X-Api-Key from the new console (UUID)",
+        "resourceId": "Resource ID",
+        "testConnection": "Test Connection",
+        "testHint": "Enter creds then Test Connection to verify + save",
+        "connected": "Connected",
+        "failed": "Failed",
+        "testing": "Testing…"
+      }
+    },
+    "provider": {
+      "title": "Provider · Doubao Seed",
+      "desc": "ASR provider settings.",
+      "recognition": "Recognition",
+      "postProcess": "Post-processing",
+      "language": "Language",
+      "languageHint": "Model natively supports zh/en code-switching; zh-CN covers most cases.",
+      "endpoint": "Endpoint",
+      "endpointHint": "bigmodel_async = bidirectional streaming (recommended)",
+      "itn": "Inverse text normalization (ITN)",
+      "itnHint": "\"one hundred twenty-three\" → \"123\"",
+      "punc": "Auto punctuation",
+      "puncHint": "Inserts punctuation at semantic boundaries",
+      "ddc": "Disfluency removal (DDC)",
+      "ddcHint": "Removes filler words like \"um\" / \"uh\"",
+      "showUtterances": "Output utterance info",
+      "showUtterancesHint": "Debug only; UI does not consume"
+    },
+    "behavior": {
+      "title": "Behavior",
+      "desc": "Trigger key and launch behavior.",
+      "trigger": "Trigger",
+      "hotkey": "Hotkey",
+      "hotkeyHint": "Press and hold to record, release to finalize. Customization not supported in this version.",
+      "launch": "Launch",
+      "openAtLogin": "Open at login",
+      "openAtLoginHint": "Run whoosh in the background at system startup.",
+      "showHud": "Show HUD while recording",
+      "showHudHint": "Off = no visual feedback while recording."
+    },
+    "logs": {
+      "title": "Logs & Privacy",
+      "desc": "No telemetry, no crash reports. Logs stay local.",
+      "diagnostics": "Diagnostics",
+      "verbose": "Verbose logging",
+      "verboseWarn": "⚠ Includes transcribed text for debugging — keep off unless reproducing an issue.",
+      "privacy": "Privacy",
+      "telemetry": "Telemetry",
+      "telemetryHint": "No usage data collected.",
+      "crash": "Crash reporting",
+      "crashHint": "No remote endpoint. Attach logs manually when filing bugs.",
+      "clipboard": "Clipboard protection",
+      "clipboardHint": "Writes carry ConcealedType / TransientType markers, kept out of clipboard history.",
+      "off": "Off",
+      "on": "On"
+    },
+    "about": {
+      "title": "About",
+      "desc": "Version and update check.",
+      "version": "Version",
+      "source": "Source",
+      "license": "License",
+      "licenseValue": "Private · personal use",
+      "checkUpdate": "Check for updates",
+      "checking": "Checking…",
+      "upToDate": "Up to date",
+      "hasUpdate": "Update available"
+    }
+  },
+  "onboarding": {
+    "title": "Welcome to whoosh",
+    "step1": {
+      "label": "Step 01 · Credentials",
+      "title": "Connect to Doubao Seed ASR",
+      "desc": "Find the fields under Volcano Engine console → Service Management → Streaming Speech Recognition 2.0. API key encrypted via safeStorage; never uploaded."
+    },
+    "step2": {
+      "label": "Step 02 · Microphone",
+      "title": "Allow whoosh to access the microphone",
+      "desc": "Audio is sent only to the configured ASR provider; not cached locally (unless Verbose logging is on); never sent to any other server.",
+      "name": "Microphone access",
+      "hint": "Clicking Grant will trigger the system prompt once.",
+      "granted": "Granted",
+      "denied": "Denied",
+      "idle": "Not granted",
+      "deniedHint": "Denied; open System Settings → Privacy → Microphone, allow Electron, then come back.",
+      "grant": "Grant access"
+    },
+    "step3": {
+      "label": "Step 03 · Accessibility (macOS only)",
+      "title": "Allow global hotkey and keyboard injection",
+      "desc": "macOS requires Accessibility permission to listen for the global Right Option key and to simulate ⌘V paste.",
+      "name": "Accessibility access",
+      "hint": "Click Open System Settings → check whoosh → come back and click Restart",
+      "warn": "After granting, app will restart to load the keyboard listener. Progress is saved.",
+      "openPrefs": "Open System Settings",
+      "waiting": "Waiting for grant…",
+      "restart": "Granted · Restart"
+    },
+    "step4": {
+      "label": "Step 04 · Try it",
+      "title": "Speak or type",
+      "desc": "Hold Right Option and speak, or type directly. Any non-empty text finishes the setup.",
+      "placeholder": "Hold Right Option to speak — text will paste here · or type directly",
+      "charCount": "{{count}} chars"
+    }
+  },
+  "errors": {
+    "PROVIDER_AUTH": "Authentication failed",
+    "PROVIDER_QUOTA": "Quota exhausted",
+    "NETWORK_ERROR": "Network error",
+    "MIC_PERMISSION": "Microphone permission denied",
+    "DURATION_TOO_SHORT": "Recording too short",
+    "UNKNOWN": "Unknown error"
+  }
+}
