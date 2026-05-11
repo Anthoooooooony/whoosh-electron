@@ -177,12 +177,16 @@ describe('decodeFrame roundtrip', () => {
     expect(frame.payload).toEqual(pcm)
   })
 
-  it('last audio frame (NEG_WITH_SEQUENCE)', () => {
+  it('last audio frame (NEG_WITH_SEQUENCE) negates sequence on wire', () => {
+    // 协议要求 NEG_WITH_SEQUENCE 的 sequence 在 wire 上为负数；
+    // caller 传 99，wire 写入 -99，decoder 也读回 -99（两补码 int32）
     const pcm = Buffer.from([1, 2, 3, 4])
     const buf = encodeAudioFrame({ pcm, sequenceNumber: 99, isLast: true })
+    // 直接核验 wire 字节：跳过 4 字节 header，紧跟 4 字节 sequence
+    expect(buf.readInt32BE(4)).toBe(-99)
     const frame = decodeFrame(buf)
     expect(frame.header.flags).toBe(Flags.NEG_WITH_SEQUENCE)
-    expect(frame.sequenceNumber).toBe(99)
+    expect(frame.sequenceNumber).toBe(-99)
     expect(flagsIsLast(frame.header.flags)).toBe(true)
   })
 

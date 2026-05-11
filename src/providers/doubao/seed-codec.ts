@@ -13,6 +13,7 @@ import {
   PROTOCOL_VERSION,
   Serialization,
   flagsHasSequence,
+  flagsIsLast,
   type CompressionValue,
   type FlagsValue,
   type MessageTypeValue,
@@ -81,10 +82,32 @@ function readUInt32BE(buf: Buffer, offset: number): number {
   return buf.readUInt32BE(offset)
 }
 
+function readInt32BE(buf: Buffer, offset: number): number {
+  if (buf.length < offset + 4) {
+    throw new Error(`SeedFrame truncated: need 4 bytes at offset ${offset}`)
+  }
+  return buf.readInt32BE(offset)
+}
+
 function writeUInt32BE(n: number): Buffer {
   const buf = Buffer.alloc(4)
   buf.writeUInt32BE(n >>> 0, 0)
   return buf
+}
+
+function writeInt32BE(n: number): Buffer {
+  const buf = Buffer.alloc(4)
+  buf.writeInt32BE(n | 0, 0)
+  return buf
+}
+
+/**
+ * 协议规定：NEG_WITH_SEQUENCE 标志的帧，sequence number 在 wire 上必须为负数
+ * （两补码，最后一帧的标识方式）。POS_SEQUENCE 直接正数。
+ */
+function writeWireSequence(flags: number, sequence: number): Buffer {
+  const wire = flagsIsLast(flags) ? -sequence : sequence
+  return writeInt32BE(wire)
 }
 
 function maybeCompress(payload: Buffer, compression: number): Buffer {
@@ -154,7 +177,7 @@ export function encodeControlFrame(opts: ControlFrameOptions): Buffer {
   const compressed = maybeCompress(rawJson, compression)
 
   const parts: Buffer[] = [packHeader(header)]
-  if (flagsHasSequence(flags)) parts.push(writeUInt32BE(opts.sequenceNumber!))
+  if (flagsHasSequence(flags)) parts.push(writeWireSequence(flags, opts.sequenceNumber!))
   parts.push(writeUInt32BE(compressed.length))
   parts.push(compressed)
 
@@ -206,7 +229,7 @@ export function encodeAudioFrame(opts: AudioFrameOptions): Buffer {
   const compressed = maybeCompress(raw, compression)
 
   const parts: Buffer[] = [packHeader(header)]
-  if (flagsHasSequence(flags)) parts.push(writeUInt32BE(opts.sequenceNumber!))
+  if (flagsHasSequence(flags)) parts.push(writeWireSequence(flags, opts.sequenceNumber!))
   parts.push(writeUInt32BE(compressed.length))
   parts.push(compressed)
 
@@ -239,7 +262,8 @@ export function decodeFrame(buf: Buffer): SeedFrame {
     errorCode = readUInt32BE(buf, offset)
     offset += 4
   } else if (flagsHasSequence(header.flags)) {
-    sequenceNumber = readUInt32BE(buf, offset)
+    // NEG_WITH_SEQUENCE 帧 sequence 为负数（int32 两补码），用 signed 读取
+    sequenceNumber = readInt32BE(buf, offset)
     offset += 4
   }
 

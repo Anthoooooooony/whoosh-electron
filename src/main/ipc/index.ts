@@ -2,8 +2,9 @@
 //
 // 设计要点：
 //   - 所有 invoke / send 入参在边界做 zod parse，校验失败直接拒绝 + 日志
-//   - M3 阶段 handler 全部是 stub（log + dummy response），具体业务逻辑由后续 milestone 替换：
-//       settings: M11 / provider:test-connection: M8 / permission:*: M5+M12 / updater:check: M15 / onboarding:*: M12
+//   - M3 阶段 handler 全部是 stub（log + dummy response），后续 milestone 替换：
+//       settings: M11 / provider:test-connection: M8 (real) / permission:*: M12 / updater:check: M15 / onboarding:*: M12
+//   - audio:chunk 在 M9 由 SessionOrchestrator 消费（通过 onAudioChunk 注入回调）
 //   - 注册函数 idempotent（重复调用 throw），由 main/index.ts 在 app.whenReady 之后调用一次
 
 import { ipcMain } from 'electron'
@@ -19,6 +20,11 @@ import {
   SettingsSetApikeySchema,
   SettingsSetSchema,
 } from '@shared/ipc/schemas.js'
+
+export interface IpcHandlerDeps {
+  /** orchestrator 消费 audio renderer 推上来的每一帧 PCM */
+  onAudioChunk(chunk: Buffer): void
+}
 
 // ───────────────────────────────────────────
 // helpers
@@ -70,7 +76,7 @@ function handleSend<C extends keyof SendContract>(
 // ───────────────────────────────────────────
 let registered = false
 
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   if (registered) throw new Error('IPC handlers already registered')
   registered = true
 
@@ -147,14 +153,14 @@ export function registerIpcHandlers(): void {
   })
 
   // ─── send (one-way) ───────────────────────
-  // M6 临时：每 25 chunks（约 1 秒）打一条 info，验证 audio pipeline 通了
-  // M9 SessionOrchestrator 接管后这里改为静默喂 provider
-  let audioChunkCount = 0
   handleSend(Channels.AUDIO_CHUNK, AudioChunkSchema, (payload) => {
-    audioChunkCount++
-    if (audioChunkCount === 1 || audioChunkCount % 25 === 0) {
-      console.info(`[ipc] audio:chunk #${audioChunkCount} · ${payload.chunk.byteLength} bytes`)
-    }
+    // Uint8Array → Buffer 零拷贝（共享同一 ArrayBuffer）
+    const buf = Buffer.from(
+      payload.chunk.buffer,
+      payload.chunk.byteOffset,
+      payload.chunk.byteLength,
+    )
+    deps.onAudioChunk(buf)
   })
 
   handleSend(Channels.AUDIO_SET_DEVICE, null, () => {
