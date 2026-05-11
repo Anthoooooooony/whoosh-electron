@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+
+# transitive vulnerabilities 强制升级
+overrides:
+  yaml: ^2.8.3
