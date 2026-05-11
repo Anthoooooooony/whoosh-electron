@@ -1,32 +1,51 @@
-import { useEffect, useState } from 'react'
+// HUD renderer · M10 完整视觉
+//
+// 视觉规范见 design/index.html（同一套 token 与 layout）。
+// 四态：recording / hover / processing / error；hover 是 UI 子态，只在 recording 时由
+// 鼠标悬停触发；其余三态来自 main 通过 hud:show 推送。
+//
+// 鼠标点击 hover 状态的胶囊 → send hud:cancel；orchestrator 收到后 ABORT_CANCEL 流程。
+
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-// M9 占位：订阅 session 事件展示状态 + partial 文本
-// M10 用 design/index.html 视觉规范替换 HudCapsule / HudRecording / HudHover / HudProcessing / HudError 四个组件
+type ServerState = 'hidden' | 'recording' | 'processing' | 'error'
+type DisplayState = ServerState | 'hover'
 
-type HudState = 'hidden' | 'recording' | 'hover' | 'processing' | 'error'
+function formatTimer(elapsedMs: number): string {
+  const totalSec = Math.floor(elapsedMs / 1000)
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, '0')
+  const ss = String(totalSec % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+}
 
 function App(): React.ReactElement | null {
-  const [state, setState] = useState<HudState>('hidden')
+  const [state, setState] = useState<ServerState>('hidden')
+  const [hover, setHover] = useState(false)
   const [partial, setPartial] = useState<string>('')
-  const [error, setError] = useState<string>('')
-  const [recordStartMs, setRecordStartMs] = useState<number>(0)
-  const [tick, setTick] = useState<number>(0)
+  const [errorMsg, setErrorMsg] = useState<string>('')
+  const [, forceRerender] = useState(0)
+  const recordStartRef = useRef<number>(0)
 
+  /* IPC subscription */
   useEffect(() => {
     const offShow = window.ipc.on('hud:show', (payload) => {
-      const next = payload?.state ?? 'recording'
-      setState(next)
-      if (next === 'recording') {
+      const next: ServerState = (payload?.state as ServerState | undefined) ?? 'recording'
+      // 'hover' 不会从 main 主动发，但 schema 允许；映射到 recording
+      const normalized: ServerState = next === 'hidden' ? 'hidden' : (next as ServerState)
+      setState(normalized)
+      if (normalized === 'recording') {
         setPartial('')
-        setError('')
-        setRecordStartMs(Date.now())
+        setErrorMsg('')
+        setHover(false)
+        recordStartRef.current = Date.now()
       }
     })
     const offHide = window.ipc.on('hud:hide', () => {
       setState('hidden')
       setPartial('')
-      setError('')
+      setErrorMsg('')
+      setHover(false)
     })
     const offPartial = window.ipc.on('session:partial', (payload) => {
       if (payload?.text) setPartial(payload.text)
@@ -35,81 +54,133 @@ function App(): React.ReactElement | null {
       if (payload?.text) setPartial(payload.text)
     })
     const offError = window.ipc.on('session:error', (payload) => {
-      setError(payload?.message ?? 'Unknown error')
+      setErrorMsg(payload?.message ?? '未知错误')
     })
 
-    const timer = setInterval(() => setTick((t) => t + 1), 250)
     return () => {
       offShow()
       offHide()
       offPartial()
       offFinal()
       offError()
-      clearInterval(timer)
     }
+  }, [])
+
+  /* recording 期间每秒刷新计时器 */
+  useEffect(() => {
+    if (state !== 'recording') return
+    const tick = setInterval(() => forceRerender((n) => n + 1), 250)
+    return () => clearInterval(tick)
+  }, [state])
+
+  /* hover handlers —— 仅 recording 可悬停取消 */
+  const onMouseEnter = useCallback(() => {
+    if (state === 'recording') setHover(true)
+  }, [state])
+  const onMouseLeave = useCallback(() => {
+    setHover(false)
+  }, [])
+  const onCancelClick = useCallback(() => {
+    window.ipc.send('hud:cancel')
+    setHover(false)
   }, [])
 
   if (state === 'hidden') return null
 
-  const elapsed =
-    state === 'recording' && recordStartMs ? Math.floor((Date.now() - recordStartMs) / 1000) : 0
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0')
-  const ss = String(elapsed % 60).padStart(2, '0')
-  // useState'tick' just to trigger re-render at 250ms cadence; value unused
-  void tick
+  const display: DisplayState = hover && state === 'recording' ? 'hover' : state
+  const elapsedMs = recordStartRef.current ? Date.now() - recordStartRef.current : 0
 
-  const isError = state === 'error'
-  const isProcessing = state === 'processing'
+  const className =
+    'hud' +
+    (display === 'hover' ? ' hud--hover' : '') +
+    (display === 'processing' ? ' hud--processing' : '') +
+    (display === 'error' ? ' hud--error' : '')
 
   return (
     <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '0 14px',
-        background: isError ? 'rgba(184, 50, 41, 0.18)' : 'rgba(248, 244, 234, 0.82)',
-        backdropFilter: 'blur(24px) saturate(1.5)',
-        borderRadius: 26,
-        border: `1px solid ${isError ? 'rgba(184,50,41,0.35)' : 'rgba(0,0,0,0.07)'}`,
-        fontFamily: '"Noto Sans SC", system-ui, sans-serif',
-        fontSize: 13,
-        color: '#15130f',
-        boxSizing: 'border-box',
-      }}
+      className={className}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={display === 'hover' ? onCancelClick : undefined}
     >
-      {isError ? (
-        <div style={{ flex: 1, color: '#b83229', fontWeight: 500 }}>{error}</div>
-      ) : isProcessing ? (
-        <div style={{ flex: 1, color: '#4a463f' }}>识别中…</div>
-      ) : (
-        <>
-          <div
-            style={{
-              fontFamily: '"IBM Plex Mono", monospace',
-              fontSize: 11,
-              color: '#4a463f',
-              fontVariantNumeric: 'tabular-nums',
-            }}
+      {/* recording: control 区 + display 区 */}
+      <div className="hud-control">
+        <div className="hud-mic-wrap">
+          <svg
+            className="hud-mic"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            ● {mm}:{ss}
-          </div>
-          <div
-            style={{
-              flex: 1,
-              overflow: 'hidden',
-              textAlign: 'right',
-              whiteSpace: 'nowrap',
-              direction: 'rtl',
-              fontWeight: 500,
-            }}
-            title={partial}
+            <rect x="9" y="2" width="6" height="12" rx="3" />
+            <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+          <span className="hud-pulse" />
+        </div>
+        <span className="hud-timer">{formatTimer(elapsedMs)}</span>
+      </div>
+      <div className="hud-display">
+        {partial ? (
+          <span className="hud-text">{partial}</span>
+        ) : (
+          <span className="hud-text hud-text--placeholder">听着…</span>
+        )}
+      </div>
+
+      {/* hover overlay: 取消转录 */}
+      {display === 'hover' && (
+        <div className="hud-cancel">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
           >
-            {partial || '听着…'}
-          </div>
-        </>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          取消转录
+        </div>
+      )}
+
+      {/* processing overlay */}
+      {display === 'processing' && (
+        <div className="hud-overlay hud-overlay--processing">
+          <span className="hud-spinner" />
+          <span className="hud-label-group">
+            <span>识别中</span>
+            <span className="hud-dots">
+              <span className="hud-dot" />
+              <span className="hud-dot" />
+              <span className="hud-dot" />
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* error overlay */}
+      {display === 'error' && (
+        <div className="hud-overlay hud-overlay--error">
+          <svg
+            className="hud-error-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>{errorMsg || '出错了'}</span>
+        </div>
       )}
     </div>
   )

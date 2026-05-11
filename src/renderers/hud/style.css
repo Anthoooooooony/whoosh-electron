@@ -1,0 +1,331 @@
+/* whoosh HUD —— 跟 design/index.html 同一套设计 token，跟随系统 light/dark */
+
+:root {
+  --hud-bg: rgba(248, 244, 234, 0.82);
+  --hud-border: rgba(0, 0, 0, 0.07);
+  --hud-shadow:
+    0 18px 50px -8px rgba(0, 0, 0, 0.28), 0 3px 10px -2px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --text: #15130f;
+  --text-2: #4a463f;
+  --text-muted: #8a8478;
+  --accent: #c66b27;
+  --accent-soft: rgba(198, 107, 39, 0.18);
+  --error: #b83229;
+  --error-bg: rgba(184, 50, 41, 0.12);
+  --error-bg-hover: rgba(184, 50, 41, 0.18);
+  --error-border: rgba(184, 50, 41, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hud-bg: rgba(20, 18, 16, 0.72);
+    --hud-border: rgba(255, 255, 255, 0.09);
+    --hud-shadow:
+      0 24px 60px -8px rgba(0, 0, 0, 0.7), 0 4px 14px -2px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --text: #f0ebe0;
+    --text-2: #b8b1a2;
+    --text-muted: #777068;
+    --accent: #e89c5c;
+    --accent-soft: rgba(232, 156, 92, 0.2);
+    --error: #e3604f;
+    --error-bg: rgba(227, 96, 79, 0.12);
+    --error-bg-hover: rgba(227, 96, 79, 0.2);
+    --error-border: rgba(227, 96, 79, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ───── capsule ───── */
+.hud {
+  width: 100%;
+  height: 100%;
+  border-radius: 26px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  overflow: hidden;
+  transition:
+    background 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: pointer;
+  opacity: 0;
+  animation: hudFadeIn 160ms ease-out forwards;
+}
+
+@keyframes hudFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ───── recording state ───── */
+.hud-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px 0 14px;
+  border-right: 1px solid var(--hud-border);
+  flex-shrink: 0;
+}
+
+.hud-mic-wrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hud-mic {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.hud-pulse {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  top: -1px;
+  right: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: micPulse 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes micPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    transform: scale(1);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+    transform: scale(1.15);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+  }
+}
+
+.hud-timer {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.hud-display {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.hud-text {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  color: var(--text);
+  max-width: calc(100% - 14px);
+  text-align: right;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14px, black 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 14px, black 100%);
+}
+
+.hud-text--placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ───── hover-cancel state ───── */
+.hud--hover {
+  background: var(--error-bg-hover);
+  border-color: var(--error-border);
+}
+
+.hud--hover .hud-control,
+.hud--hover .hud-display {
+  display: none;
+}
+
+.hud-cancel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--error);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.hud-cancel svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ───── processing / error overlay ───── */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.hud-overlay--processing {
+  color: var(--text-2);
+}
+
+.hud-overlay--error {
+  color: var(--error);
+}
+
+.hud--processing .hud-control,
+.hud--processing .hud-display,
+.hud--error .hud-control,
+.hud--error .hud-display {
+  display: none;
+}
+
+.hud--error {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  animation: errorShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes errorShake {
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-3px, 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+.hud-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hud-label-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.hud-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+  position: relative;
+  top: -1px;
+}
+
+.hud-dot {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+
+.hud-dots .hud-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.hud-dots .hud-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.hud-dots .hud-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dotBounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.hud-error-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--error);
+  flex-shrink: 0;
+}

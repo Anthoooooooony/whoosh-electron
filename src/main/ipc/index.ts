@@ -24,6 +24,8 @@ import {
 export interface IpcHandlerDeps {
   /** orchestrator 消费 audio renderer 推上来的每一帧 PCM */
   onAudioChunk(chunk: Buffer): void
+  /** HUD 点击「取消转录」时调；通常 dispatch CANCEL_CLICK 给 FSM */
+  onHudCancel(): void
 }
 
 // ───────────────────────────────────────────
@@ -168,7 +170,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleSend(Channels.HUD_CANCEL, null, () => {
-    console.info('[ipc] hud:cancel (stub)')
+    deps.onHudCancel()
   })
 
   handleSend(Channels.ONBOARDING_DONE, null, () => {

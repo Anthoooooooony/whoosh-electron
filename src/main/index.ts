@@ -13,8 +13,13 @@ import { join } from 'node:path'
 import type { DoubaoProviderConfig } from '@providers/doubao/index.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { SessionOrchestrator } from './orchestrator/index.js'
-import { dispatchSessionDone, startHotkeyListener, stopHotkeyListener } from './hotkey/index.js'
-import { createAllWindows, getAppWindows } from './windows.js'
+import {
+  dispatchCancelClick,
+  dispatchSessionDone,
+  startHotkeyListener,
+  stopHotkeyListener,
+} from './hotkey/index.js'
+import { createAllWindows, getAppWindows, hideHudWindow, showHudOnActiveScreen } from './windows.js'
 
 /* ───── dev-mode .env 读取（M11 settings 上线后这部分用 store 替代） ───── */
 
@@ -92,11 +97,14 @@ if (!gotLock) {
       getDoubaoConfig: () => doubaoConfig,
       getAudioWebContents: () => getAppWindows()?.audio.webContents,
       getHudWebContents: () => getAppWindows()?.hud.webContents,
+      showHudWindow: () => showHudOnActiveScreen(),
+      hideHudWindow: () => hideHudWindow(),
       notifyHotkeyDone: () => dispatchSessionDone(),
     })
 
     registerIpcHandlers({
       onAudioChunk: (chunk) => orchestrator.handleAudioChunk(chunk),
+      onHudCancel: () => dispatchCancelClick(),
     })
 
     startHotkeyListener((action) => orchestrator.handleHotkeyAction(action))

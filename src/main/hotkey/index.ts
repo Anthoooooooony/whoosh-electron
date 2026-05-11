@@ -87,6 +87,19 @@ export function dispatchSessionDone(): void {
   }
 }
 
+/**
+ * 用户在 HUD 上点击「取消转录」时调用：把 CANCEL_CLICK 事件喂给 FSM，
+ * recording 态会转为 canceling 并 emit ABORT_CANCEL。
+ */
+export function dispatchCancelClick(): void {
+  if (!fsm) return
+  const action = fsm.send({ type: 'CANCEL_CLICK' })
+  if (action) {
+    console.info(`[hotkey] ${action} (via HUD)`)
+    actionListener?.(action)
+  }
+}
+
 export function stopHotkeyListener(): void {
   if (!started) return
   try {
