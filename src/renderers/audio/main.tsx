@@ -4,7 +4,6 @@
 // 真正的工作在 bridge.ts 里完成：订阅 main 推送的 audio:start/stop/abort，
 // 启停 getUserMedia + AudioWorklet。
 
-import '../_shared/global'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { startCapture, stopCapture } from './bridge.js'

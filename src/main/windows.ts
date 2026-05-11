@@ -12,7 +12,8 @@ const isDev = !!process.env['ELECTRON_RENDERER_URL']
 type RendererName = 'audio' | 'hud' | 'settings' | 'onboarding'
 
 function rendererURL(name: RendererName): string {
-  if (isDev) return `${process.env['ELECTRON_RENDERER_URL']}/src/renderers/${name}/index.html`
+  // dev: vite 的 root 配为 src/renderers/，所以服务在 /{name}/index.html
+  if (isDev) return `${process.env['ELECTRON_RENDERER_URL']}/${name}/index.html`
   // 生产：renderer 打到 out/renderer/{name}/index.html，main 在 out/main，路径相对
   return pathToFileURL(join(__dirname, '..', 'renderer', name, 'index.html')).toString()
 }
@@ -47,6 +48,19 @@ export function createAllWindows(): AppWindows {
       preload: preloadPath('audio'),
     },
   })
+  if (isDev) {
+    // 先挂监听再 loadURL，确保初始加载阶段的 console / 错误都能被捕获
+    audio.webContents.on('console-message', (e) => {
+      console.info(`[audio-renderer] ${e.message}`)
+    })
+    audio.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      console.error(`[audio-renderer] did-fail-load ${code} ${desc} url=${url}`)
+    })
+    audio.webContents.on('render-process-gone', (_e, details) => {
+      console.error(`[audio-renderer] render-process-gone`, details)
+    })
+    audio.webContents.openDevTools({ mode: 'detach' })
+  }
   audio.loadURL(rendererURL('audio'))
 
   // HUD：M2 阶段视觉占位，bottom-center 定位、无边框、透明背景
