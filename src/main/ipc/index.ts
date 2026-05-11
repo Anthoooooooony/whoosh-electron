@@ -16,16 +16,31 @@ import {
   OnboardingCompleteStepRequestSchema,
   PermissionOpenSystemPrefsSchema,
   ProviderTestConnectionRequestSchema,
+  ProviderTestConnectionResponseSchema,
   SettingsGetApikeySchema,
   SettingsSetApikeySchema,
   SettingsSetSchema,
 } from '@shared/ipc/schemas.js'
+
+import type { AppConfig, AppConfigPatch } from '../store/index.js'
 
 export interface IpcHandlerDeps {
   /** orchestrator 消费 audio renderer 推上来的每一帧 PCM */
   onAudioChunk(chunk: Buffer): void
   /** HUD 点击「取消转录」时调；通常 dispatch CANCEL_CLICK 给 FSM */
   onHudCancel(): void
+  /** 读取当前配置 */
+  getConfig(): AppConfig
+  /** 部分更新配置；返回合并后的新配置 */
+  setConfig(patch: AppConfigPatch): AppConfig
+  /** 读取某 provider 的 API key（safeStorage 解密后） */
+  getApiKey(providerId: string): string | null
+  /** 写入某 provider 的 API key */
+  setApiKey(providerId: string, key: string): void
+  /** 用候选凭据真实连接一次 ASR provider 做握手，验证可用 */
+  testProviderConnection(
+    req: z.infer<typeof ProviderTestConnectionRequestSchema>,
+  ): Promise<z.infer<typeof ProviderTestConnectionResponseSchema>>
 }
 
 // ───────────────────────────────────────────
@@ -89,45 +104,34 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleInvoke(Channels.SETTINGS_GET, null, () => {
-    console.info('[ipc] settings:get (stub)')
-    return {
-      audio: { inputDeviceId: null },
-      providers: {},
-      currentProviderId: 'doubao' as const,
-      behavior: { showHudWhenRecording: true, openAtLogin: false },
-      logging: { verbose: false },
-      ui: { locale: 'zh-CN' as const },
-      onboarding: { completedSteps: [], done: false },
-    }
+    return deps.getConfig()
   })
 
   handleInvoke(Channels.SETTINGS_SET, SettingsSetSchema, (req) => {
-    console.info('[ipc] settings:set (stub)', req)
-    return {
-      audio: { inputDeviceId: null },
-      providers: {},
-      currentProviderId: 'doubao' as const,
-      behavior: { showHudWhenRecording: true, openAtLogin: false },
-      logging: { verbose: false },
-      ui: { locale: 'zh-CN' as const },
-      onboarding: { completedSteps: [], done: false },
-    }
+    return deps.setConfig(req)
   })
 
   handleInvoke(Channels.SETTINGS_GET_APIKEY, SettingsGetApikeySchema, (req) => {
-    console.info('[ipc] settings:get-apikey (stub)', req)
-    return { key: null }
+    return { key: deps.getApiKey(req.providerId) }
   })
 
   handleInvoke(Channels.SETTINGS_SET_APIKEY, SettingsSetApikeySchema, (req) => {
-    console.info('[ipc] settings:set-apikey (stub)', { providerId: req.providerId })
+    deps.setApiKey(req.providerId, req.key)
     return { ok: true as const }
   })
 
-  handleInvoke(Channels.PROVIDER_TEST_CONNECTION, ProviderTestConnectionRequestSchema, (req) => {
-    console.info('[ipc] provider:test-connection (stub)', { providerId: req.providerId })
-    return { ok: false, error: 'not implemented' }
-  })
+  handleInvoke(
+    Channels.PROVIDER_TEST_CONNECTION,
+    ProviderTestConnectionRequestSchema,
+    async (req) => {
+      const result = await deps.testProviderConnection(req)
+      // 兜底校验输出
+      const parsed = ProviderTestConnectionResponseSchema.safeParse(result)
+      return parsed.success
+        ? parsed.data
+        : { ok: false, error: 'invalid testProviderConnection result' }
+    },
+  )
 
   handleInvoke(Channels.ONBOARDING_GET_STEP, null, () => {
     console.info('[ipc] onboarding:get-step (stub)')
