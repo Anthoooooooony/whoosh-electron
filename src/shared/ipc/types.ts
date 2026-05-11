@@ -97,6 +97,7 @@ export interface SendContract {
   [Channels.HUD_CANCEL]: void
   [Channels.ONBOARDING_DONE]: void
   [Channels.PERMISSION_OPEN_SYSTEM_PREFS]: z.infer<typeof PermissionOpenSystemPrefsSchema>
+  [Channels.APP_RELAUNCH]: void
 }
 
 // ───────────────────────────────────────────

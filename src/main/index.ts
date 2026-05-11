@@ -143,6 +143,12 @@ if (!gotLock) {
       setConfig: (patch) => setConfig(patch),
       getApiKey: (id) => getApiKey(id),
       setApiKey: (id, key) => setApiKey(id, key),
+      onOnboardingDone: () => {
+        const w = getAppWindows()
+        w?.onboarding.hide()
+        w?.settings.show()
+        w?.settings.focus()
+      },
       testProviderConnection: async (req) => {
         if (req.providerId !== 'doubao') {
           return { ok: false, error: `unknown provider ${req.providerId}` }
@@ -170,6 +176,17 @@ if (!gotLock) {
     })
 
     startHotkeyListener((action) => orchestrator.handleHotkeyAction(action))
+
+    // 决定首次展示哪个窗口：onboarding 未完 → 显示 onboarding；否则显示 settings
+    const cfg = getConfig()
+    const w = getAppWindows()
+    if (!cfg.onboarding.done) {
+      w?.onboarding.show()
+      w?.onboarding.focus()
+    } else {
+      w?.settings.show()
+      w?.settings.focus()
+    }
   })
 
   app.on('will-quit', () => {
