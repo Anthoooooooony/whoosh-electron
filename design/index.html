@@ -1,0 +1,2178 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>whoosh-electron — design mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────
+   design tokens
+   ───────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --bg:           #F5F2EB;
+  --bg-2:         #EDE8DC;
+  --surface:      #FFFFFF;
+  --surface-2:    #FAF7F0;
+  --surface-3:    #F0EBDE;
+  --border:       #E2DCCD;
+  --border-strong:#C7BFA8;
+  --text:         #15130F;
+  --text-2:       #4A463F;
+  --text-muted:   #8A8478;
+  --accent:       #C66B27;
+  --accent-strong:#A8531D;
+  --accent-soft:  #F4E6D3;
+  --success:      #2F7A52;
+  --success-soft: #DCEBE2;
+  --error:        #B83229;
+  --error-soft:   #F4D4CE;
+  --warn:         #C97A19;
+  --warn-soft:    #F4E2C0;
+  --hud-bg:       rgba(248, 244, 234, 0.82);
+  --hud-border:   rgba(0,0,0,0.07);
+  --hud-shadow:   0 18px 50px -8px rgba(0,0,0,0.28), 0 3px 10px -2px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+  --window-bg:    #FBF8F1;
+  --traffic-r:    #FF5F57;
+  --traffic-y:    #FEBC2E;
+  --traffic-g:    #28C840;
+  --shadow-window:0 32px 80px -16px rgba(20, 18, 12, 0.22), 0 8px 24px -6px rgba(20, 18, 12, 0.08);
+  --noise: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+:root[data-theme="dark"] {
+  --bg:           #0E0D0B;
+  --bg-2:         #16140F;
+  --surface:      #1A1816;
+  --surface-2:    #221F1B;
+  --surface-3:    #2A2622;
+  --border:       #2C2925;
+  --border-strong:#403C36;
+  --text:         #F0EBE0;
+  --text-2:       #B8B1A2;
+  --text-muted:   #777068;
+  --accent:       #E89C5C;
+  --accent-strong:#F2B27A;
+  --accent-soft:  #2E2317;
+  --success:      #4FB888;
+  --success-soft: #1B2E22;
+  --error:        #E5604F;
+  --error-soft:   #2F1B17;
+  --warn:         #E0A140;
+  --warn-soft:    #2D2114;
+  --hud-bg:       rgba(20, 18, 16, 0.72);
+  --hud-border:   rgba(255,255,255,0.09);
+  --hud-shadow:   0 24px 60px -8px rgba(0,0,0,0.7), 0 4px 14px -2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  --window-bg:    #161310;
+  --shadow-window:0 32px 80px -16px rgba(0, 0, 0, 0.6), 0 8px 24px -6px rgba(0, 0, 0, 0.4);
+}
+
+/* ─────────────────────────────────────────────────────────
+   base
+   ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  font-weight: 400;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+  position: relative;
+  letter-spacing: 0.005em;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: var(--noise);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: multiply;
+}
+:root[data-theme="dark"] body::before { mix-blend-mode: overlay; opacity: 0.5; }
+
+.display { font-family: 'Noto Serif SC', 'Songti SC', serif; font-weight: 500; }
+.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-feature-settings: 'zero' 1; font-variant-numeric: tabular-nums; }
+
+button, input, textarea, select { font-family: inherit; font-size: inherit; }
+button { cursor: pointer; border: none; background: none; color: inherit; }
+
+/* ─────────────────────────────────────────────────────────
+   page layout
+   ───────────────────────────────────────────────────────── */
+.page {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 56px 64px 160px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 36px;
+  margin-bottom: 80px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 600;
+  font-size: 60px;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--text);
+}
+.brand em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0.05em;
+}
+.brand-sub {
+  display: block;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 14px;
+  font-weight: 500;
+}
+
+.meta-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+.meta-row {
+  display: flex;
+  gap: 24px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.meta-row span strong {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.theme-toggle button {
+  padding: 6px 14px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.theme-toggle button[data-active] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* ─────────────────────────────────────────────────────────
+   section
+   ───────────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 140px;
+  position: relative;
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 48px;
+  padding-bottom: 24px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--border);
+}
+.section-label {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 600;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--text);
+}
+.section-title em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 700;
+}
+.section-lede {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-2);
+  max-width: 360px;
+  margin: 0;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+/* state tabs */
+.state-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.state-tab {
+  padding: 7px 16px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.state-tab:hover { color: var(--text-2); }
+.state-tab[data-active] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+:root[data-theme="dark"] .state-tab[data-active] {
+  background: var(--surface-3);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* ─────────────────────────────────────────────────────────
+   HUD section
+   ───────────────────────────────────────────────────────── */
+.hud-stage {
+  position: relative;
+  height: 380px;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(120, 70, 40, 0.5), transparent 70%),
+    radial-gradient(ellipse 60% 60% at 80% 90%, rgba(40, 60, 90, 0.6), transparent 60%),
+    linear-gradient(160deg, #2a2520 0%, #14110e 100%);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 36px;
+}
+.hud-stage::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: var(--noise);
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.hud-stage-label {
+  position: absolute;
+  top: 18px; left: 24px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hud-stage-label::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+.hud-stage-coord {
+  position: absolute;
+  top: 18px; right: 24px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.25);
+}
+
+/* the actual HUD capsule */
+.hud {
+  width: 304px;
+  height: 52px;
+  border-radius: 26px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: pointer;
+}
+
+/* HUD left section: control panel */
+.hud-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px 0 14px;
+  border-right: 1px solid var(--hud-border);
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hud-mic-wrap {
+  position: relative;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.hud-mic {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+.hud-pulse {
+  position: absolute;
+  width: 6px; height: 6px;
+  top: -1px; right: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: micPulse 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes micPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); transform: scale(1); }
+  70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); transform: scale(1.15); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); transform: scale(1); }
+}
+
+.hud-timer {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* HUD right section: display */
+.hud-display {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.hud-text {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  color: var(--text);
+  max-width: calc(100% - 14px);
+  text-align: right;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14px, black 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 14px, black 100%);
+}
+.hud-cursor {
+  display: inline-block;
+  width: 1.5px;
+  height: 14px;
+  background: var(--accent);
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  animation: blink 0.9s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+
+/* ─── hover state: morphs into cancel button ─── */
+.hud[data-state="hover"] {
+  background: color-mix(in srgb, var(--error) 14%, var(--hud-bg));
+  border-color: color-mix(in srgb, var(--error) 40%, var(--hud-border));
+  box-shadow:
+    0 18px 50px -8px color-mix(in srgb, var(--error) 30%, rgba(0,0,0,0.3)),
+    0 3px 10px -2px rgba(0,0,0,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.hud[data-state="hover"] .hud-control {
+  border-right-color: transparent;
+}
+.hud[data-state="hover"] .hud-mic-wrap,
+.hud[data-state="hover"] .hud-pulse,
+.hud[data-state="hover"] .hud-timer,
+.hud[data-state="hover"] .hud-text {
+  display: none;
+}
+.hud[data-state="hover"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: none;
+}
+.hud-cancel {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--error);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.hud[data-state="hover"] .hud-cancel { display: flex; }
+.hud-cancel svg { width: 14px; height: 14px; }
+
+/* ─── centered overlays (processing & error) ─── */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.hud-processing-overlay { color: var(--text-2); }
+.hud-error-overlay { color: var(--error); }
+.hud-overlay > span { white-space: nowrap; }
+
+.hud-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hud-label-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.hud-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+  position: relative;
+  top: -1px;
+}
+.hud-dot {
+  width: 3.5px; height: 3.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+.hud-dots .hud-dot:nth-child(1) { animation-delay: 0s; }
+.hud-dots .hud-dot:nth-child(2) { animation-delay: 0.15s; }
+.hud-dots .hud-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dotBounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+
+.hud-error-icon {
+  width: 14px; height: 14px;
+  color: var(--error);
+  flex-shrink: 0;
+}
+
+/* state: processing — hide control/display, show overlay centered */
+.hud[data-state="processing"] .hud-control,
+.hud[data-state="processing"] .hud-display { display: none; }
+.hud[data-state="processing"] .hud-processing-overlay { display: flex; }
+
+/* state: error — hide control/display, show overlay centered, with shake */
+.hud[data-state="error"] {
+  background: color-mix(in srgb, var(--error) 12%, var(--hud-bg));
+  border-color: color-mix(in srgb, var(--error) 35%, var(--hud-border));
+  animation: errorShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes errorShake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+  40%, 60% { transform: translate3d(3px, 0, 0); }
+}
+.hud[data-state="error"] .hud-control,
+.hud[data-state="error"] .hud-display { display: none; }
+.hud[data-state="error"] .hud-error-overlay { display: flex; }
+
+/* ─────────────────────────────────────────────────────────
+   window frame (used in Onboarding + Settings)
+   ───────────────────────────────────────────────────────── */
+.window {
+  background: var(--window-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow-window);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+}
+.window-titlebar {
+  height: 40px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+  position: relative;
+}
+:root[data-theme="dark"] .window-titlebar { background: var(--surface); }
+.tl {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #c4c4c4;
+}
+.tl-r { background: var(--traffic-r); }
+.tl-y { background: var(--traffic-y); }
+.tl-g { background: var(--traffic-g); }
+:root[data-theme="dark"] .tl-r,
+:root[data-theme="dark"] .tl-y,
+:root[data-theme="dark"] .tl-g { opacity: 0.92; }
+.window-title {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Onboarding
+   ───────────────────────────────────────────────────────── */
+.onb-window {
+  width: 580px;
+  margin: 0 auto;
+}
+.onb-body {
+  padding: 40px 56px 32px;
+  min-height: 540px;
+  display: flex;
+  flex-direction: column;
+  background: var(--window-bg);
+}
+
+.onb-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 36px;
+}
+.onb-progress-seg {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  position: relative;
+  overflow: hidden;
+}
+.onb-progress-seg[data-status="done"] {
+  background: var(--accent);
+}
+.onb-progress-seg[data-status="active"] {
+  background: var(--surface-3);
+}
+.onb-progress-seg[data-status="active"]::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 40%;
+  background: var(--accent);
+  animation: progressFlow 1.4s cubic-bezier(0.4, 0.0, 0.6, 1) infinite;
+}
+@keyframes progressFlow {
+  0%   { left: -40%; width: 30%; }
+  50%  { left: 35%; width: 50%; }
+  100% { left: 100%; width: 30%; }
+}
+
+.onb-step-no {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+.onb-title {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.onb-title em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 700;
+}
+.onb-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+  margin: 0 0 32px;
+  max-width: 420px;
+}
+
+.onb-content {
+  flex: 1;
+}
+
+.onb-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 28px;
+}
+.onb-step-counter {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.onb-step-counter strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.onb-buttons { display: flex; gap: 10px; }
+
+/* form fields */
+.field-group { margin-bottom: 18px; }
+.field-label {
+  display: block;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.field-input,
+.field-textarea {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  transition: all 0.18s ease;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+}
+.field-input:focus,
+.field-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.field-input::placeholder { color: var(--text-muted); }
+.field-textarea {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  resize: none;
+  min-height: 120px;
+  line-height: 1.55;
+}
+
+.field-with-toggle { position: relative; }
+.field-toggle-vis {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  transition: color 0.18s, background 0.18s;
+}
+.field-toggle-vis:hover { color: var(--text); background: var(--surface-3); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+.btn-primary {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+}
+.btn-primary:hover { background: var(--accent); }
+.btn-primary:disabled {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--text-2); }
+.btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+.btn-ghost:hover { color: var(--text); }
+
+.btn-test {
+  padding: 7px 14px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.btn-test:hover { background: color-mix(in srgb, var(--accent) 18%, var(--accent-soft)); }
+.btn-test svg { width: 11px; height: 11px; }
+:root[data-theme="dark"] .btn-test {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+  vertical-align: middle;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-pill::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+.status-success { background: var(--success-soft); color: var(--success); }
+.status-success::before { background: var(--success); }
+.status-error { background: var(--error-soft); color: var(--error); }
+.status-error::before { background: var(--error); }
+.status-warn { background: var(--warn-soft); color: var(--warn); }
+.status-warn::before { background: var(--warn); }
+.status-idle { background: var(--surface-3); color: var(--text-muted); }
+.status-idle::before { background: var(--text-muted); }
+
+.test-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.test-bar-result {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.test-bar-result em { font-style: normal; color: var(--text); font-weight: 600; }
+
+/* onboarding step illustrations */
+.onb-illust {
+  height: 130px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* perm card (step 2/3) */
+.perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.perm-row + .perm-row { margin-top: 12px; }
+.perm-info { display: flex; flex-direction: column; gap: 4px; }
+.perm-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.perm-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* try input */
+.try-wrap {
+  position: relative;
+}
+.try-counter {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.try-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  box-shadow: 0 1px 0 var(--border-strong);
+  color: var(--text-2);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Settings window
+   ───────────────────────────────────────────────────────── */
+.set-window {
+  width: 880px;
+  margin: 0 auto;
+}
+.set-body {
+  display: flex;
+  height: 580px;
+}
+.set-sidebar {
+  width: 220px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+:root[data-theme="dark"] .set-sidebar { background: var(--surface); }
+
+.set-brand-mini {
+  padding: 6px 18px 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.set-brand-name {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  line-height: 1;
+}
+.set-brand-name em { font-style: normal; color: var(--accent); font-weight: 700; }
+.set-brand-ver {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+.set-nav-section {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px 22px 6px;
+  font-weight: 500;
+}
+.set-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 22px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+.set-nav-item svg { width: 14px; height: 14px; opacity: 0.75; flex-shrink: 0; }
+.set-nav-item:hover { background: var(--surface-3); color: var(--text); }
+:root[data-theme="dark"] .set-nav-item:hover { background: var(--surface-2); }
+.set-nav-item[data-active] {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--surface-3);
+}
+:root[data-theme="dark"] .set-nav-item[data-active] { background: var(--surface-2); }
+.set-nav-item[data-active]::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+}
+.set-nav-item[data-active] svg { color: var(--accent); opacity: 1; }
+
+.set-sidebar-footer {
+  margin-top: auto;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.dot-listen {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.set-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--window-bg);
+}
+.set-section-pane {
+  padding: 32px 40px;
+}
+.set-section-pane[data-pane] { display: none; }
+.set-section-pane[data-pane][data-active] { display: block; }
+
+.set-pane-header {
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.set-pane-eyebrow {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.set-pane-title {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+.set-pane-desc {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.set-group {
+  margin-bottom: 32px;
+}
+.set-group-title {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+.set-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.set-row:last-child { border-bottom: none; }
+.set-row-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.set-row-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+.set-row-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.set-row-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* select */
+.select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  cursor: pointer;
+  font-weight: 500;
+  min-width: 180px;
+  justify-content: space-between;
+  vertical-align: middle;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.select-arrow {
+  width: 10px; height: 10px;
+  color: var(--text-muted);
+}
+
+/* toggle */
+.toggle {
+  display: inline-block;
+  width: 36px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  left: 2px; top: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.toggle[data-on] {
+  background: var(--accent);
+}
+.toggle[data-on]::after {
+  left: 16px;
+}
+
+/* kbd display */
+.kbd-display {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  vertical-align: middle;
+  line-height: 1;
+}
+.kbd-key {
+  padding: 4px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-weight: 500;
+  color: var(--text-2);
+  box-shadow: 0 1px 0 var(--border-strong);
+  letter-spacing: 0;
+}
+
+/* mic test mini */
+.mic-test-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mic-level {
+  width: 80px;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mic-level-bar {
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: 2px;
+}
+
+.warn-callout {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--warn-soft);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--warn-soft));
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--warn) 80%, var(--text));
+  line-height: 1.5;
+  margin-top: 10px;
+}
+.warn-callout svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--warn); }
+
+.about-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 24px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.about-key {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.about-val {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+}
+.about-val.mono {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 12.5px;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  border-top: 1px dashed var(--border);
+}
+.link-row a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.link-row a:hover { text-decoration: underline; }
+.link-row .sep { color: var(--text-muted); }
+
+/* schema form for provider */
+.adv-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.adv-toggle svg { width: 11px; height: 11px; transition: transform 0.2s; }
+
+/* footnotes */
+.footnote {
+  margin-top: 100px;
+  padding-top: 36px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.footnote em { font-style: normal; color: var(--text-2); font-family: 'Noto Serif SC', 'Songti SC', serif; letter-spacing: 0; font-size: 12.5px; font-weight: 600; }
+
+/* small responsive */
+@media (max-width: 920px) {
+  .page { padding: 32px 24px 80px; }
+  .brand { font-size: 44px; }
+  .section-head { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .section-lede { text-align: left; }
+  .hud { width: min(100%, 480px); }
+  .onb-window, .set-window { width: 100%; }
+  .set-body { flex-direction: column; height: auto; }
+  .set-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+
+<body>
+<div class="page">
+
+  <!-- ─── page header ───────────────────────────────────── -->
+  <header class="page-header">
+    <div>
+      <h1 class="brand">whoosh<em>·</em>electron</h1>
+      <span class="brand-sub">AI 语音输入法 · v0.1.0 — 界面 mock</span>
+    </div>
+    <div class="meta-block">
+      <div class="meta-row">
+        <span><strong>macOS</strong> menubar</span>
+        <span><strong>Windows</strong> tray</span>
+        <span>ASR: <strong>Doubao Seed</strong></span>
+      </div>
+      <div class="theme-toggle" id="themeToggle">
+        <button data-theme-set="light" data-active>Light</button>
+        <button data-theme-set="dark">Dark</button>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ─── HUD section ───────────────────────────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-label">01 · 屏幕浮窗</span>
+        <h2 class="section-title">底部 <em>胶囊</em>。</h2>
+      </div>
+      <p class="section-lede">
+        浮于活动屏幕底部中央。50ms 显示防抖；松开按键后保留至粘贴完成。
+        四态：录音中 · 悬停取消 · 识别中 · 错误。
+      </p>
+    </div>
+
+    <div class="state-tabs" data-tabset="hud">
+      <button class="state-tab" data-state-target="recording" data-active>录音中</button>
+      <button class="state-tab" data-state-target="hover">悬停取消</button>
+      <button class="state-tab" data-state-target="processing">识别中</button>
+      <button class="state-tab" data-state-target="error">错误</button>
+    </div>
+
+    <div class="hud-stage">
+      <span class="hud-stage-label">simulated desktop / active screen</span>
+      <span class="hud-stage-coord mono">x: center · y: bottom-72px</span>
+
+      <div class="hud" id="hudCapsule" data-state="recording">
+        <!-- recording layout -->
+        <div class="hud-control">
+          <div class="hud-mic-wrap">
+            <svg class="hud-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="2" width="6" height="12" rx="3"/>
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+            <span class="hud-pulse"></span>
+          </div>
+          <span class="hud-timer">00:08</span>
+        </div>
+        <div class="hud-display">
+          <span class="hud-text">将设计稿同步到 Notion，并 ping 一下产品组</span>
+        </div>
+
+        <!-- processing overlay (centered) -->
+        <div class="hud-overlay hud-processing-overlay">
+          <span class="hud-spinner"></span>
+          <span class="hud-label-group">
+            <span>识别中</span>
+            <span class="hud-dots">
+              <span class="hud-dot"></span>
+              <span class="hud-dot"></span>
+              <span class="hud-dot"></span>
+            </span>
+          </span>
+        </div>
+
+        <!-- error overlay (centered) -->
+        <div class="hud-overlay hud-error-overlay">
+          <svg class="hud-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>网络中断 · 请重试</span>
+        </div>
+
+        <!-- hover cancel overlay -->
+        <div class="hud-cancel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          取消转录
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ─── Onboarding section ─────────────────────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-label">02 · 引导设置</span>
+        <h2 class="section-title">首次启动 <em>4 步</em>。</h2>
+      </div>
+      <p class="section-lede">
+        独立窗口，居中模态。
+        每步硬门槛：凭据 → 麦克风 → 辅助功能 → 试用。第 3 步授权后 app 自动重启，从第 4 步恢复。
+      </p>
+    </div>
+
+    <div class="state-tabs" data-tabset="onb">
+      <button class="state-tab" data-state-target="1" data-active>01 · 凭据</button>
+      <button class="state-tab" data-state-target="2">02 · 麦克风</button>
+      <button class="state-tab" data-state-target="3">03 · 辅助功能</button>
+      <button class="state-tab" data-state-target="4">04 · 试用</button>
+    </div>
+
+    <div class="window onb-window">
+      <div class="window-titlebar">
+        <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+        <span class="window-title">欢迎使用 whoosh</span>
+      </div>
+
+      <div class="onb-body" id="onbBody">
+
+        <!-- progress -->
+        <div class="onb-progress" id="onbProgress">
+          <span class="onb-progress-seg" data-status="active"></span>
+          <span class="onb-progress-seg"></span>
+          <span class="onb-progress-seg"></span>
+          <span class="onb-progress-seg"></span>
+        </div>
+
+        <!-- step 1 -->
+        <div class="onb-pane" data-pane="1">
+          <span class="onb-step-no">第 01 步 · 凭据</span>
+          <h3 class="onb-title">连接到 <em>豆包·Seed ASR</em>。</h3>
+          <p class="onb-desc">
+            在火山引擎控制台「语音识别」资源页找到对应字段。Access Token 仅本机保存（macOS Keychain / Windows DPAPI），不会上传。
+          </p>
+
+          <div class="onb-content">
+            <div class="field-group">
+              <label class="field-label">App ID</label>
+              <input class="field-input" type="text" value="1827495610" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Access Token</label>
+              <div class="field-with-toggle">
+                <input class="field-input" type="password" value="VCsBYr_w8K2_zKxTtAS6vQ_RV0Vy8aFf" />
+                <button class="field-toggle-vis" title="显示 / 隐藏">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Resource ID</label>
+              <input class="field-input" type="text" value="volc.bigasr.sauc.duration" />
+            </div>
+
+            <div class="test-bar">
+              <div class="test-bar-result">
+                连通性：<em>已验证</em> · 服务端响应 142ms
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="status-pill status-success">OK</span>
+                <button class="btn-test">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+                  重新测试
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="onb-footer">
+            <span class="onb-step-counter"><strong>1</strong> / 4</span>
+            <div class="onb-buttons">
+              <button class="btn btn-ghost">退出</button>
+              <button class="btn btn-primary">继续 →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- step 2 -->
+        <div class="onb-pane" data-pane="2" style="display:none">
+          <span class="onb-step-no">第 02 步 · 麦克风</span>
+          <h3 class="onb-title">允许 whoosh 访问<em>麦克风</em>。</h3>
+          <p class="onb-desc">
+            录音数据仅作为 ASR 流的输入，不会本地缓存（debug 模式除外，需手动开启）、不会上传到 Doubao 之外的任何服务器。
+          </p>
+
+          <div class="onb-content">
+            <div class="onb-illust" style="height: 80px;">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="24" y="8" width="16" height="32" rx="8"/>
+                <path d="M14 28v4a18 18 0 0 0 36 0v-4"/>
+                <line x1="32" y1="50" x2="32" y2="58"/>
+                <line x1="22" y1="58" x2="42" y2="58"/>
+                <circle cx="32" cy="20" r="1.5" fill="var(--accent)"/>
+                <circle cx="32" cy="26" r="1.5" fill="var(--accent)"/>
+                <circle cx="32" cy="32" r="1.5" fill="var(--accent)"/>
+              </svg>
+            </div>
+
+            <div class="perm-row">
+              <div class="perm-info">
+                <span class="perm-name">麦克风访问</span>
+                <span class="perm-hint">系统弹窗将出现一次，点击「允许」完成授权。</span>
+              </div>
+              <span class="status-pill status-idle">必需</span>
+            </div>
+          </div>
+
+          <div class="onb-footer">
+            <span class="onb-step-counter"><strong>2</strong> / 4</span>
+            <div class="onb-buttons">
+              <button class="btn btn-secondary">← 返回</button>
+              <button class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                授予访问权限
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- step 3 -->
+        <div class="onb-pane" data-pane="3" style="display:none">
+          <span class="onb-step-no">第 03 步 · 辅助功能（仅 macOS）</span>
+          <h3 class="onb-title">允许全局快捷键与<em>键盘注入</em>。</h3>
+          <p class="onb-desc">
+            macOS 需要在「系统设置 → 隐私与安全 → 辅助功能」勾选 whoosh，用于：监听全局右 Option 触发键、模拟 ⌘V 把识别文本粘贴到当前 app。授权后 app 会自动重启一次。
+          </p>
+
+          <div class="onb-content">
+            <div class="onb-illust">
+              <svg width="220" height="80" viewBox="0 0 220 80" fill="none">
+                <!-- keyboard outline -->
+                <rect x="2" y="14" width="216" height="60" rx="6" stroke="var(--text-muted)" stroke-width="1.2" fill="var(--surface)"/>
+                <!-- key rows -->
+                <g stroke="var(--border-strong)" stroke-width="1" fill="var(--surface-2)">
+                  <rect x="10" y="22" width="14" height="14" rx="2"/>
+                  <rect x="26" y="22" width="14" height="14" rx="2"/>
+                  <rect x="42" y="22" width="14" height="14" rx="2"/>
+                  <rect x="58" y="22" width="14" height="14" rx="2"/>
+                  <rect x="74" y="22" width="14" height="14" rx="2"/>
+                  <rect x="90" y="22" width="14" height="14" rx="2"/>
+                  <rect x="106" y="22" width="14" height="14" rx="2"/>
+                  <rect x="122" y="22" width="14" height="14" rx="2"/>
+                  <rect x="138" y="22" width="14" height="14" rx="2"/>
+                  <rect x="154" y="22" width="14" height="14" rx="2"/>
+                  <rect x="170" y="22" width="14" height="14" rx="2"/>
+                  <rect x="186" y="22" width="14" height="14" rx="2"/>
+                  <rect x="202" y="22" width="8" height="14" rx="2"/>
+
+                  <rect x="10" y="38" width="14" height="14" rx="2"/>
+                  <rect x="26" y="38" width="14" height="14" rx="2"/>
+                  <rect x="42" y="38" width="14" height="14" rx="2"/>
+                  <rect x="58" y="38" width="14" height="14" rx="2"/>
+                  <rect x="74" y="38" width="14" height="14" rx="2"/>
+                  <rect x="90" y="38" width="14" height="14" rx="2"/>
+                  <rect x="106" y="38" width="14" height="14" rx="2"/>
+                  <rect x="122" y="38" width="14" height="14" rx="2"/>
+                  <rect x="138" y="38" width="14" height="14" rx="2"/>
+                  <rect x="154" y="38" width="14" height="14" rx="2"/>
+                  <rect x="170" y="38" width="14" height="14" rx="2"/>
+                  <rect x="186" y="38" width="14" height="14" rx="2"/>
+                  <rect x="202" y="38" width="8" height="14" rx="2"/>
+
+                  <rect x="10" y="54" width="22" height="14" rx="2"/>
+                  <rect x="34" y="54" width="14" height="14" rx="2"/>
+                  <rect x="50" y="54" width="14" height="14" rx="2"/>
+                  <rect x="66" y="54" width="14" height="14" rx="2"/>
+                  <rect x="82" y="54" width="60" height="14" rx="2"/>
+                  <rect x="144" y="54" width="14" height="14" rx="2"/>
+                </g>
+                <!-- highlighted right option -->
+                <rect x="160" y="54" width="14" height="14" rx="2" fill="var(--accent)" stroke="var(--accent-strong)" stroke-width="1.2"/>
+                <text x="167" y="64" font-family="IBM Plex Mono" font-size="6" fill="white" text-anchor="middle" font-weight="600">⌥</text>
+                <!-- callout -->
+                <path d="M167 76 L167 86" stroke="var(--accent)" stroke-width="1.2"/>
+                <text x="167" y="98" font-family="IBM Plex Mono" font-size="8" fill="var(--accent)" text-anchor="middle" letter-spacing="1">RIGHT OPTION</text>
+              </svg>
+            </div>
+
+            <div class="perm-row">
+              <div class="perm-info">
+                <span class="perm-name">辅助功能访问</span>
+                <span class="perm-hint">点击下方按钮跳转到「系统设置 → 隐私与安全 → 辅助功能」。</span>
+              </div>
+              <span class="status-pill status-idle">必需</span>
+            </div>
+
+            <div class="warn-callout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              授权完成后 whoosh 会自动重启以加载键盘监听 hook。当前进度已保存，将自动恢复到第 4 步。
+            </div>
+          </div>
+
+          <div class="onb-footer">
+            <span class="onb-step-counter"><strong>3</strong> / 4</span>
+            <div class="onb-buttons">
+              <button class="btn btn-secondary">← 返回</button>
+              <button class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                打开系统设置
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- step 4 -->
+        <div class="onb-pane" data-pane="4" style="display:none">
+          <span class="onb-step-no">第 04 步 · 试用</span>
+          <h3 class="onb-title">说一句，或<em>敲</em>一句。</h3>
+          <p class="onb-desc">
+            按住右 Option 说话试试，或直接键盘输入。任意非空文本即可完成首次设置。
+          </p>
+
+          <div class="onb-content">
+            <div class="try-wrap">
+              <textarea class="field-textarea" placeholder="按住右 Option 说话，松开后文字会粘到这里 · 或直接键入" style="min-height: 140px;">将设计稿同步到 Notion，并 ping 一下产品组</textarea>
+              <span class="try-counter">22 字</span>
+            </div>
+            <div class="try-hint">
+              提示：当前触发键是 <span class="kbd">⌥ 右 Option</span>，可在「行为」面板查看。鼠标 hover HUD 可取消转录。
+            </div>
+          </div>
+
+          <div class="onb-footer">
+            <span class="onb-step-counter"><strong>4</strong> / 4</span>
+            <div class="onb-buttons">
+              <button class="btn btn-secondary">← 返回</button>
+              <button class="btn btn-primary">完成设置 ✓</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ─── Settings section ───────────────────────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-label">03 · 偏好设置</span>
+        <h2 class="section-title">主<em>设置</em>窗口。</h2>
+      </div>
+      <p class="section-lede">
+        macOS 系统设置风格：左侧 5 个分组垂直 tab，右侧由 provider schema 渲染内容。关闭窗口仅隐藏，后台监听不受影响。
+      </p>
+    </div>
+
+    <div class="state-tabs" data-tabset="set">
+      <button class="state-tab" data-state-target="setup" data-active>基础</button>
+      <button class="state-tab" data-state-target="provider">服务商</button>
+      <button class="state-tab" data-state-target="behavior">行为</button>
+      <button class="state-tab" data-state-target="logs">日志与隐私</button>
+      <button class="state-tab" data-state-target="about">关于</button>
+    </div>
+
+    <div class="window set-window">
+      <div class="window-titlebar">
+        <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+        <span class="window-title">whoosh — 偏好设置</span>
+      </div>
+
+      <div class="set-body">
+        <!-- sidebar -->
+        <aside class="set-sidebar">
+          <div class="set-brand-mini">
+            <div class="set-brand-name">whoosh<em>·</em></div>
+            <div class="set-brand-ver">v0.1.0 · build 0517</div>
+          </div>
+
+          <div class="set-nav-section">配置</div>
+          <div class="set-nav-item" data-nav-target="setup" data-active>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            基础
+          </div>
+          <div class="set-nav-item" data-nav-target="provider">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            服务商
+          </div>
+          <div class="set-nav-item" data-nav-target="behavior">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="10" y1="7" x2="10.01" y2="7"/><line x1="14" y1="7" x2="14.01" y2="7"/><line x1="18" y1="7" x2="18.01" y2="7"/><line x1="6" y1="11" x2="6.01" y2="11"/><line x1="10" y1="11" x2="14" y2="11"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+            行为
+          </div>
+          <div class="set-nav-item" data-nav-target="logs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="14" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
+            日志与隐私
+          </div>
+          <div class="set-nav-item" data-nav-target="about">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            关于
+          </div>
+
+          <div class="set-sidebar-footer">
+            <span class="dot-listen"></span>
+            <span>监听中 · 右 ⌥</span>
+          </div>
+        </aside>
+
+        <!-- content -->
+        <div class="set-content" id="setContent">
+
+          <!-- pane: setup -->
+          <div class="set-section-pane" data-pane="setup" data-active>
+            <div class="set-pane-header">
+              <span class="set-pane-eyebrow">— 配置 / 01</span>
+              <h3 class="set-pane-title">基础</h3>
+              <p class="set-pane-desc">麦克风设备、API 凭据与系统权限状态。</p>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">麦克风</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">输入设备</span>
+                    <span class="set-row-hint">默认跟随系统当前选择的输入设备。</span>
+                  </div>
+                  <div class="set-row-control">
+                    <button class="select">
+                      系统默认 <span style="color: var(--text-muted)">· 内置麦克风</span>
+                      <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">录音测试</span>
+                    <span class="set-row-hint">按住按钮录音 1.5 秒以验证设备是否工作。</span>
+                  </div>
+                  <div class="set-row-control mic-test-box">
+                    <div class="mic-level"><div class="mic-level-bar"></div></div>
+                    <button class="btn-test">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      测试
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">API 凭据 · 豆包</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">App ID</span>
+                    <span class="set-row-hint mono" style="font-size: 11.5px;">1827495610</span>
+                  </div>
+                  <button class="btn-test">编辑</button>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">Access Token</span>
+                    <span class="set-row-hint mono" style="font-size: 11.5px;">VCsB••••••••••••••••••••••••aFf</span>
+                  </div>
+                  <button class="btn-test">编辑</button>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">Resource ID</span>
+                    <span class="set-row-hint mono" style="font-size: 11.5px;">volc.bigasr.sauc.duration</span>
+                  </div>
+                  <button class="btn-test">编辑</button>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">连通性</span>
+                    <span class="set-row-hint">2 分钟前已检查 · 142ms.</span>
+                  </div>
+                  <div class="set-row-control" style="display:flex; gap:8px; align-items:center;">
+                    <span class="status-pill status-success">已连接</span>
+                    <button class="btn-test">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
+                      重新测试
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">系统权限</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">麦克风</span>
+                    <span class="set-row-hint">在系统设置中撤销后，下次录音前会重新提示。</span>
+                  </div>
+                  <span class="status-pill status-success">已授权</span>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">辅助功能 · macOS</span>
+                    <span class="set-row-hint">用于监听全局右 Option 触发键、模拟粘贴动作。</span>
+                  </div>
+                  <span class="status-pill status-success">已授权</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- pane: provider -->
+          <div class="set-section-pane" data-pane="provider">
+            <div class="set-pane-header">
+              <span class="set-pane-eyebrow">— 配置 / 02</span>
+              <h3 class="set-pane-title">服务商 · 豆包 Seed</h3>
+              <p class="set-pane-desc">ASR 服务商相关设置。字段由 provider schema 自动渲染。</p>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">识别</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">识别语言</span>
+                    <span class="set-row-hint">模型原生支持中英混合 code-switching，<em>zh-CN</em> 已覆盖大多数日常场景。</span>
+                  </div>
+                  <div class="set-row-control">
+                    <button class="select">
+                      zh-CN · 中文（含中英混合）
+                      <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">模型</span>
+                    <span class="set-row-hint mono" style="font-size: 11px;">seed-bigmodel · streaming</span>
+                  </div>
+                  <div class="set-row-control">
+                    <button class="select" style="min-width: 200px;">
+                      seed-bigmodel
+                      <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">后处理</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">文本逆归一化（ITN）</span>
+                    <span class="set-row-hint">"一百二十三" → "123"</span>
+                  </div>
+                  <div class="set-row-control"><span class="toggle" data-on></span></div>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">自动标点</span>
+                    <span class="set-row-hint">在语义边界自动插入「，。？！」</span>
+                  </div>
+                  <div class="set-row-control"><span class="toggle" data-on></span></div>
+                </div>
+              </div>
+              <div class="adv-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                高级参数 · VAD、热词、强制识别时长
+              </div>
+            </div>
+          </div>
+
+          <!-- pane: behavior -->
+          <div class="set-section-pane" data-pane="behavior">
+            <div class="set-pane-header">
+              <span class="set-pane-eyebrow">— 配置 / 03</span>
+              <h3 class="set-pane-title">行为</h3>
+              <p class="set-pane-desc">触发键与启动行为。</p>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">触发</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">快捷键</span>
+                    <span class="set-row-hint">长按录音，松开完成。当前版本不支持自定义。</span>
+                  </div>
+                  <div class="set-row-control">
+                    <div class="kbd-display">
+                      <span class="kbd-key">⌥</span>
+                      <span style="opacity:.6">右 Option</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">启动</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">开机自启</span>
+                    <span class="set-row-hint">系统启动时自动后台运行 whoosh。</span>
+                  </div>
+                  <div class="set-row-control"><span class="toggle"></span></div>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">录音时显示 HUD</span>
+                    <span class="set-row-hint">关闭后录音过程将无任何屏幕反馈。</span>
+                  </div>
+                  <div class="set-row-control"><span class="toggle" data-on></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- pane: logs -->
+          <div class="set-section-pane" data-pane="logs">
+            <div class="set-pane-header">
+              <span class="set-pane-eyebrow">— 配置 / 04</span>
+              <h3 class="set-pane-title">日志与隐私</h3>
+              <p class="set-pane-desc">whoosh 不上传任何遥测、不上报崩溃。日志仅本地保存。</p>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">诊断</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">详细日志</span>
+                    <span class="set-row-hint" style="color: var(--warn);">⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。</span>
+                  </div>
+                  <div class="set-row-control"><span class="toggle"></span></div>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">日志位置</span>
+                    <span class="set-row-hint mono" style="font-size: 11px;">~/Library/Logs/whoosh/main.log</span>
+                  </div>
+                  <button class="btn-test">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    打开文件夹
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">隐私</h4>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">遥测</span>
+                    <span class="set-row-hint">不会收集任何使用数据。</span>
+                  </div>
+                  <span class="status-pill status-success">已关闭</span>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">崩溃上报</span>
+                    <span class="set-row-hint">无远程上报端点。报告 bug 时手动附上日志。</span>
+                  </div>
+                  <span class="status-pill status-success">已关闭</span>
+                </div>
+                <div class="set-row">
+                  <div class="set-row-info">
+                    <span class="set-row-label">剪贴板保护</span>
+                    <span class="set-row-hint">写入剪贴板时附带 concealed marker，不进入剪贴板管理器历史。</span>
+                  </div>
+                  <span class="status-pill status-success">已启用</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- pane: about -->
+          <div class="set-section-pane" data-pane="about">
+            <div class="set-pane-header">
+              <span class="set-pane-eyebrow">— 配置 / 05</span>
+              <h3 class="set-pane-title">关于</h3>
+              <p class="set-pane-desc">版本与更新检查。</p>
+            </div>
+
+            <div class="set-group">
+              <div class="about-grid">
+                <span class="about-key">版本</span>
+                <span class="about-val mono">0.1.0 · build 0517 · macOS arm64</span>
+
+                <span class="about-key">发布日期</span>
+                <span class="about-val mono">2026-05-09 · 17:42</span>
+
+                <span class="about-key">最新可用</span>
+                <span class="about-val" style="display:flex; align-items:center; gap:10px;">
+                  <span class="mono">0.1.1</span>
+                  <span class="status-pill status-warn">有更新</span>
+                </span>
+
+                <span class="about-key">Electron</span>
+                <span class="about-val mono">v32.4.0</span>
+
+                <span class="about-key">Node</span>
+                <span class="about-val mono">v20.18.1</span>
+              </div>
+
+              <div style="display:flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-primary">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  检查更新
+                </button>
+                <button class="btn btn-secondary">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/><path d="M21 14v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/></svg>
+                  打开 0.1.1 发布页
+                </button>
+              </div>
+            </div>
+
+            <div class="set-group">
+              <h4 class="set-group-title">链接</h4>
+              <div class="about-grid" style="padding: 16px 24px;">
+                <span class="about-key">源码</span>
+                <span class="about-val mono"><a href="#" style="color: var(--accent); text-decoration: none;">github.com/mikaa/whoosh-electron</a></span>
+                <span class="about-key">Issues</span>
+                <span class="about-val mono"><a href="#" style="color: var(--accent); text-decoration: none;">github.com/mikaa/whoosh-electron/issues</a></span>
+                <span class="about-key">许可证</span>
+                <span class="about-val">私有 · 仅个人使用</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- footer -->
+  <footer class="footnote">
+    <span>whoosh · 界面设计 mock · 供 feature-dev 阶段移交</span>
+    <em>quiet instruments, loud silences.</em>
+  </footer>
+
+</div>
+
+<script>
+  // theme toggle
+  const themeRoot = document.documentElement;
+  document.querySelectorAll('[data-theme-set]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.themeSet;
+      themeRoot.setAttribute('data-theme', t);
+      document.querySelectorAll('[data-theme-set]').forEach(b => b.removeAttribute('data-active'));
+      btn.setAttribute('data-active', '');
+    });
+  });
+
+  // state-tab switchers per section
+  function bindTabs(tabsetName, targetAttr, paneAttr, container) {
+    const tabs = document.querySelectorAll(`[data-tabset="${tabsetName}"] .state-tab`);
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.stateTarget;
+        // switch active tab
+        tabs.forEach(t => t.removeAttribute('data-active'));
+        tab.setAttribute('data-active', '');
+        // apply
+        if (tabsetName === 'hud') {
+          document.getElementById('hudCapsule').setAttribute('data-state', target);
+        } else if (tabsetName === 'onb') {
+          document.querySelectorAll('.onb-pane').forEach(p => p.style.display = 'none');
+          document.querySelector(`.onb-pane[data-pane="${target}"]`).style.display = 'flex';
+          document.querySelector(`.onb-pane[data-pane="${target}"]`).style.flexDirection = 'column';
+          // progress
+          const segs = document.querySelectorAll('#onbProgress .onb-progress-seg');
+          segs.forEach((s, i) => {
+            s.removeAttribute('data-status');
+            if (i < parseInt(target) - 1) s.setAttribute('data-status', 'done');
+            else if (i === parseInt(target) - 1) s.setAttribute('data-status', 'active');
+          });
+        } else if (tabsetName === 'set') {
+          document.querySelectorAll('.set-section-pane').forEach(p => p.removeAttribute('data-active'));
+          document.querySelector(`.set-section-pane[data-pane="${target}"]`).setAttribute('data-active', '');
+          // sidebar nav
+          document.querySelectorAll('.set-nav-item').forEach(n => n.removeAttribute('data-active'));
+          document.querySelector(`.set-nav-item[data-nav-target="${target}"]`).setAttribute('data-active', '');
+        }
+      });
+    });
+  }
+  bindTabs('hud');
+  bindTabs('onb');
+  bindTabs('set');
+
+  // sidebar nav also clickable
+  document.querySelectorAll('.set-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.dataset.navTarget;
+      document.querySelector(`[data-tabset="set"] .state-tab[data-state-target="${target}"]`).click();
+    });
+  });
+
+  // simulate live HUD timer
+  let timerVal = 8;
+  setInterval(() => {
+    timerVal = (timerVal + 1) % 60;
+    const mm = '00';
+    const ss = String(timerVal).padStart(2, '0');
+    document.querySelector('.hud-timer').textContent = `${mm}:${ss}`;
+  }, 1000);
+
+  // streaming text simulation
+  const streamingPhrases = [
+    '将设计稿同步到 Notion，并 ping 一下产品组',
+    '帮我把刚才那段会议纪要发给 Alex',
+    'commit 这次改动，message 是 feat add streaming asr provider',
+    '把这段 markdown 渲染到右边的预览面板',
+    'pull 最新的 main 然后 rebase 我这个分支',
+  ];
+  let phraseIdx = 0;
+  setInterval(() => {
+    const hudText = document.querySelector('.hud-text');
+    if (!hudText) return;
+    if (document.getElementById('hudCapsule').getAttribute('data-state') !== 'recording') return;
+    phraseIdx = (phraseIdx + 1) % streamingPhrases.length;
+    hudText.textContent = streamingPhrases[phraseIdx];
+  }, 3200);
+
+  // toggle clicks
+  document.querySelectorAll('.toggle').forEach(t => {
+    t.addEventListener('click', () => {
+      if (t.hasAttribute('data-on')) t.removeAttribute('data-on');
+      else t.setAttribute('data-on', '');
+    });
+  });
+
+  // hud capsule hover toggles to hover state (only when recording)
+  const capsule = document.getElementById('hudCapsule');
+  let restoreState = null;
+  capsule.addEventListener('mouseenter', () => {
+    const s = capsule.getAttribute('data-state');
+    if (s === 'recording') {
+      restoreState = s;
+      capsule.setAttribute('data-state', 'hover');
+      document.querySelector('[data-tabset="hud"] .state-tab[data-state-target="hover"]').click();
+    }
+  });
+
+  // field toggle vis (password show/hide)
+  document.querySelectorAll('.field-toggle-vis').forEach(b => {
+    b.addEventListener('click', () => {
+      const inp = b.previousElementSibling;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+  });
+</script>
+
+</body>
+</html>

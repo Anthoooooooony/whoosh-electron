@@ -1,0 +1,12 @@
+node_modules
+dist
+out
+release
+.vite
+pnpm-lock.yaml
+design
+src/native/prebuilds
+src/native/**/build
+
+# 设计/规划文档手工排版，prettier 会破坏 markdown 缩进与代码块
+BLUEPRINT.md

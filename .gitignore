@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build artifacts
+dist/
+out/
+.vite/
+release/
+*.tsbuildinfo
+
+# native build outputs
+build/Release/
+build/Debug/
+src/native/**/build/
+src/native/prebuilds/**/*.node
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# env
+.env
+.env.local
+.env.*.local
+
+# tests
+coverage/
