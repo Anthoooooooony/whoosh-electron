@@ -6,6 +6,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { initI18n } from '@shared/i18n/index.js'
+
+initI18n()
 
 type SectionKey = 'setup' | 'provider' | 'behavior' | 'logs' | 'about'
 

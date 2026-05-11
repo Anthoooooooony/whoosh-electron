@@ -1,0 +1,155 @@
+{
+  "brand": "whoosh",
+  "common": {
+    "loading": "加载中…",
+    "back": "返回",
+    "continue": "继续",
+    "finish": "完成设置",
+    "save": "保存",
+    "cancel": "取消",
+    "refresh": "刷新",
+    "test": "测试"
+  },
+  "hud": {
+    "listening": "听着…",
+    "processing": "识别中",
+    "cancel": "取消转录",
+    "unknownError": "出错了"
+  },
+  "settings": {
+    "title": "偏好设置",
+    "sections": {
+      "setup": "基础",
+      "provider": "服务商",
+      "behavior": "行为",
+      "logs": "日志与隐私",
+      "about": "关于"
+    },
+    "footer": "监听中 · 右 ⌥",
+    "setup": {
+      "title": "基础",
+      "desc": "麦克风设备、API 凭据与系统权限状态。",
+      "mic": {
+        "title": "麦克风",
+        "device": "输入设备",
+        "deviceHint": "默认跟随系统当前选择的输入设备。",
+        "default": "系统默认"
+      },
+      "credentials": {
+        "title": "API 凭据 · 豆包",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "新版控制台 X-Api-Key（UUID 格式）",
+        "resourceId": "Resource ID",
+        "testConnection": "Test Connection",
+        "testHint": "填好凭据后点 Test Connection 验证 + 保存",
+        "connected": "已连接",
+        "failed": "失败",
+        "testing": "测试中…"
+      }
+    },
+    "provider": {
+      "title": "服务商 · 豆包 Seed",
+      "desc": "ASR 服务商相关设置。",
+      "recognition": "识别",
+      "postProcess": "后处理",
+      "language": "识别语言",
+      "languageHint": "模型原生支持中英混合 code-switching，zh-CN 已覆盖大多数日常场景。",
+      "endpoint": "Endpoint 模式",
+      "endpointHint": "bigmodel_async = 双向流式优化版（推荐）",
+      "itn": "文本逆归一化（ITN）",
+      "itnHint": "\"一百二十三\" → \"123\"",
+      "punc": "自动标点",
+      "puncHint": "在语义边界自动插入「，。？！」",
+      "ddc": "语义顺滑（DDC）",
+      "ddcHint": "删除\"嗯\"\"啊\"等填充词，提升书面感",
+      "showUtterances": "输出分句信息",
+      "showUtterancesHint": "仅 debug 时开启；上层 UI 不消费"
+    },
+    "behavior": {
+      "title": "行为",
+      "desc": "触发键与启动行为。",
+      "trigger": "触发",
+      "hotkey": "快捷键",
+      "hotkeyHint": "长按录音，松开完成。当前版本不支持自定义。",
+      "launch": "启动",
+      "openAtLogin": "开机自启",
+      "openAtLoginHint": "系统启动时自动后台运行 whoosh。",
+      "showHud": "录音时显示 HUD",
+      "showHudHint": "关闭后录音过程将无任何屏幕反馈。"
+    },
+    "logs": {
+      "title": "日志与隐私",
+      "desc": "whoosh 不上传任何遥测、不上报崩溃。日志仅本地保存。",
+      "diagnostics": "诊断",
+      "verbose": "详细日志",
+      "verboseWarn": "⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。",
+      "privacy": "隐私",
+      "telemetry": "遥测",
+      "telemetryHint": "不会收集任何使用数据。",
+      "crash": "崩溃上报",
+      "crashHint": "无远程上报端点。报告 bug 时手动附上日志。",
+      "clipboard": "剪贴板保护",
+      "clipboardHint": "写入时附带 ConcealedType / TransientType 标记，不进剪贴板历史。",
+      "off": "已关闭",
+      "on": "已启用"
+    },
+    "about": {
+      "title": "关于",
+      "desc": "版本与更新检查。",
+      "version": "版本",
+      "source": "源码",
+      "license": "许可证",
+      "licenseValue": "私有 · 仅个人使用",
+      "checkUpdate": "检查更新",
+      "checking": "检查中…",
+      "upToDate": "当前已是最新版本",
+      "hasUpdate": "有新版本"
+    }
+  },
+  "onboarding": {
+    "title": "欢迎使用 whoosh",
+    "step1": {
+      "label": "第 01 步 · 凭据",
+      "title": "连接到豆包·Seed ASR",
+      "desc": "在火山引擎控制台「服务管理 → 流式语音识别 2.0」找到对应字段。API Key 仅本机 safeStorage 加密保存，不会上传。"
+    },
+    "step2": {
+      "label": "第 02 步 · 麦克风",
+      "title": "允许 whoosh 访问麦克风",
+      "desc": "录音数据仅作为 ASR 流的输入，不会本地缓存（除非手动开启 Verbose logging），不会上传到豆包之外的任何服务器。",
+      "name": "麦克风访问",
+      "hint": "点击\"Grant\"会触发系统弹窗一次。",
+      "granted": "已授权",
+      "denied": "被拒绝",
+      "idle": "未授权",
+      "deniedHint": "被拒绝；可手动在「系统设置 → 隐私与安全 → 麦克风」开启 Electron 权限再回来继续。",
+      "grant": "授予访问权限"
+    },
+    "step3": {
+      "label": "第 03 步 · 辅助功能（仅 macOS）",
+      "title": "允许全局快捷键与键盘注入",
+      "desc": "macOS 需要在「系统设置 → 隐私与安全 → 辅助功能」勾选 whoosh，用于：监听全局右 Option 触发键、模拟 ⌘V 把识别文本粘贴到当前 app。",
+      "name": "辅助功能访问",
+      "hint": "点「Open System Settings」跳转 → 勾选 whoosh → 回来点「已授权，重启」",
+      "warn": "授权完成后 app 会重启加载键盘 listener。当前进度已保存，会自动恢复到 Step 04。",
+      "openPrefs": "Open System Settings",
+      "waiting": "等待授权…",
+      "restart": "已授权，重启"
+    },
+    "step4": {
+      "label": "第 04 步 · 试用",
+      "title": "说一句，或敲一句",
+      "desc": "按住右 Option 说话试试，或直接键盘输入。任意非空文本即可完成首次设置。",
+      "placeholder": "按住右 Option 说话，松开后文字会粘到这里 · 或直接键入",
+      "charCount": "已输入 {{count}} 字"
+    }
+  },
+  "errors": {
+    "PROVIDER_AUTH": "鉴权失败",
+    "PROVIDER_QUOTA": "配额耗尽",
+    "NETWORK_ERROR": "网络中断",
+    "MIC_PERMISSION": "麦克风权限被拒",
+    "DURATION_TOO_SHORT": "录音太短",
+    "UNKNOWN": "未知错误"
+  }
+}

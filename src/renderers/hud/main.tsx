@@ -8,6 +8,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { initI18n } from '@shared/i18n/index.js'
+
+initI18n()
 
 type ServerState = 'hidden' | 'recording' | 'processing' | 'error'
 type DisplayState = ServerState | 'hover'
