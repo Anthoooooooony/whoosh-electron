@@ -21,8 +21,53 @@
 // payload 是否是 JSON 看 header 的 serialization 位。
 
 /* ─── endpoint ───────────────────────────────────────────── */
-export const DOUBAO_ENDPOINT = 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel'
-export const DEFAULT_RESOURCE_ID = 'volc.bigasr.sauc.duration'
+/**
+ * 三个流式 endpoint 变体：
+ *   bigmodel        — 双向流式标准版：每输入一包返回一包
+ *   bigmodel_async  — 双向流式优化版：仅结果变化时返回（推荐 v1，更省带宽 + 更低延迟）
+ *   bigmodel_nostream — 流式输入模式：≥15s 或 last 包后才返回；不适合"按住即说"
+ */
+export const Endpoint = {
+  bigmodel: 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel',
+  bigmodel_async: 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async',
+  bigmodel_nostream: 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream',
+} as const
+export type EndpointKey = keyof typeof Endpoint
+export const DEFAULT_ENDPOINT_KEY: EndpointKey = 'bigmodel_async'
+
+/**
+ * Resource ID 取决于服务版本与计费方式：
+ *   v1 (BigASR)     · 小时版 = volc.bigasr.sauc.duration
+ *   v1 (BigASR)     · 并发版 = volc.bigasr.sauc.concurrent
+ *   v2 (SeedASR 2.0)· 小时版 = volc.seedasr.sauc.duration
+ *   v2 (SeedASR 2.0)· 并发版 = volc.seedasr.sauc.concurrent
+ *
+ * 新版控制台开通的"流式语音识别 2.0"对应 v2 系列。
+ */
+export const ResourceId = {
+  v1_duration: 'volc.bigasr.sauc.duration',
+  v1_concurrent: 'volc.bigasr.sauc.concurrent',
+  v2_duration: 'volc.seedasr.sauc.duration',
+  v2_concurrent: 'volc.seedasr.sauc.concurrent',
+} as const
+export type ResourceIdKey = keyof typeof ResourceId
+export const DEFAULT_RESOURCE_ID = ResourceId.v2_duration
+
+/* ─── HTTP request headers ───────────────────────────────── */
+export const Header = {
+  // 新版控制台（单 API Key 模式）
+  ApiKey: 'X-Api-Key',
+  // 旧版控制台（App Key + Access Key 双 header）
+  ApiAppKey: 'X-Api-App-Key',
+  ApiAccessKey: 'X-Api-Access-Key',
+  // 通用
+  ApiResourceId: 'X-Api-Resource-Id',
+  ApiRequestId: 'X-Api-Request-Id',
+  ApiSequence: 'X-Api-Sequence', // 固定 -1
+  ApiConnectId: 'X-Api-Connect-Id',
+  // 响应
+  TtLogid: 'X-Tt-Logid',
+} as const
 
 /* ─── header field constants ─────────────────────────────── */
 export const PROTOCOL_VERSION = 0b0001
