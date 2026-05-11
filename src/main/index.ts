@@ -21,6 +21,7 @@ import {
 } from './hotkey/index.js'
 import { createAllWindows, getAppWindows, hideHudWindow, showHudOnActiveScreen } from './windows.js'
 import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
+import { createTray, destroyTray } from './tray.js'
 
 /* ───── dev .env override（无 .env 则走 store） ───── */
 
@@ -121,7 +122,11 @@ if (!gotLock) {
       callback(permission === 'media')
     })
 
+    // macOS：隐 Dock 图标，跟 menubar 入口对齐 LSUIElement 行为
+    if (process.platform === 'darwin') app.dock?.hide()
+
     createAllWindows()
+    createTray()
 
     const env = loadDotEnv()
     const hasEnvCreds = !!buildDoubaoFromEnv(env)
@@ -177,20 +182,19 @@ if (!gotLock) {
 
     startHotkeyListener((action) => orchestrator.handleHotkeyAction(action))
 
-    // 决定首次展示哪个窗口：onboarding 未完 → 显示 onboarding；否则显示 settings
+    // 决定首次展示哪个窗口：onboarding 未完 → 显示 onboarding；
+    // 否则什么都不显示——用户从 menubar/tray 打开 settings
     const cfg = getConfig()
     const w = getAppWindows()
     if (!cfg.onboarding.done) {
       w?.onboarding.show()
       w?.onboarding.focus()
-    } else {
-      w?.settings.show()
-      w?.settings.focus()
     }
   })
 
   app.on('will-quit', () => {
     stopHotkeyListener()
+    destroyTray()
   })
 
   app.on('window-all-closed', () => {
