@@ -5,6 +5,7 @@
 import { app } from 'electron'
 import { createAllWindows } from './windows.js'
 import { registerIpcHandlers } from './ipc/index.js'
+import { startHotkeyListener, stopHotkeyListener } from './hotkey/index.js'
 
 // 单例锁；第二实例启动时唤起已有实例的主面板
 const gotLock = app.requestSingleInstanceLock()
@@ -18,6 +19,11 @@ if (!gotLock) {
   app.whenReady().then(() => {
     registerIpcHandlers()
     createAllWindows()
+    startHotkeyListener()
+  })
+
+  app.on('will-quit', () => {
+    stopHotkeyListener()
   })
 
   // macOS：所有窗口关掉不退出（menubar/tray 模式由 M14 落地）

@@ -1,5 +1,6 @@
 allowBuilds:
   esbuild: true
+  uiohook-napi: true
 
 # transitive vulnerabilities 强制升级
 overrides:

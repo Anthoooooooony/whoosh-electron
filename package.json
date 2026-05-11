@@ -58,6 +58,7 @@
     "node-addon-api": "^8.7.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "uiohook-napi": "^1.5.5",
     "zod": "^4.4.3"
   },
   "pnpm": {
