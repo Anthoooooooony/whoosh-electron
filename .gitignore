@@ -13,6 +13,7 @@ release/
 build/Release/
 build/Debug/
 src/native/**/build/
+src/native/**/bin/
 src/native/prebuilds/**/*.node
 
 # logs

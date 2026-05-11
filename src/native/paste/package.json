@@ -1,0 +1,8 @@
+{
+  "name": "@whoosh/native-paste",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Native paste addon for whoosh-electron (NSPasteboard + CGEventPost on macOS, SetClipboardData + SendInput on Windows)",
+  "main": "index.ts",
+  "gypfile": true
+}
