@@ -130,7 +130,7 @@ function App(): React.ReactElement | null {
         {partial ? (
           <span className="hud-text">{partial}</span>
         ) : (
-          <span className="hud-text hud-text--placeholder">听着…</span>
+          <span className="hud-text hud-text--placeholder">识别中…</span>
         )}
       </div>
 

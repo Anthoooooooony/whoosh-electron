@@ -173,9 +173,17 @@ body {
   mask-image: linear-gradient(to right, transparent 0%, black 14px, black 100%);
 }
 
+/* 占位文案没有流式语义，居中显示，去掉右对齐与左渐隐遮罩 */
 .hud-text--placeholder {
   color: var(--text-muted);
   font-weight: 400;
+  right: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  max-width: calc(100% - 16px);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 /* ───── hover-cancel state ───── */

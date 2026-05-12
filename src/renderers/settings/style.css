@@ -63,6 +63,18 @@ select {
   font-size: inherit;
   color: inherit;
 }
+
+/* 顶部 28px 拖动条；与 macOS hiddenInset titlebar 对齐 */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 1000;
+  -webkit-app-region: drag;
+  pointer-events: none;
+}
 button {
   cursor: pointer;
   border: none;

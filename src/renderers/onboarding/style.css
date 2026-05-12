@@ -65,6 +65,18 @@ textarea {
   font-size: inherit;
   color: inherit;
 }
+
+/* 顶部 28px 拖动条；与 macOS hiddenInset titlebar 对齐 */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 1000;
+  -webkit-app-region: drag;
+  pointer-events: none;
+}
 button {
   cursor: pointer;
   border: none;
@@ -175,6 +187,21 @@ button {
   resize: none;
   min-height: 120px;
   line-height: 1.55;
+}
+.field-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.field-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .field-textarea:focus {
   border-color: var(--accent);
