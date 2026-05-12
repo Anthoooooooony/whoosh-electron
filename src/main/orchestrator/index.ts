@@ -24,6 +24,8 @@ import type { HotkeyAction } from '../hotkey/fsm.js'
 export interface OrchestratorDeps {
   /** 调用方拉取当前生效的 Doubao 配置；null 表示尚未配好（onboarding 未完成或凭据缺失） */
   getDoubaoConfig(): DoubaoProviderConfig | null
+  /** 用户在 Settings 选定的 input device id；null/空 = 系统默认 */
+  getInputDeviceId(): string | null
   getAudioWebContents(): WebContents | undefined
   getHudWebContents(): WebContents | undefined
   /** showInactive 把 HUD BrowserWindow 显示到 active screen，但不抢焦点 */
@@ -110,7 +112,9 @@ export class SessionOrchestrator {
     this.deps.getHudWebContents()?.send(Channels.HUD_SHOW, { state: 'recording' })
     this.scheduleHudShow()
     this.broadcastSessionState()
-    this.deps.getAudioWebContents()?.send(Channels.AUDIO_START, { deviceId: null })
+    this.deps.getAudioWebContents()?.send(Channels.AUDIO_START, {
+      deviceId: this.deps.getInputDeviceId() || null,
+    })
 
     // 创建 provider 并挂事件
     const provider = new DoubaoProvider(config)
@@ -151,8 +155,18 @@ export class SessionOrchestrator {
     try {
       await this.provider?.finish()
     } catch (err) {
-      // provider 'error' 事件已经 surface 过；finish 失败时 partial/final 流也结束了
       console.warn('[orchestrator] provider.finish failed:', err)
+      // 兜底：若 provider 没主动 emit 'error'（例如 ws 在 finishing 期间被对端关掉），
+      // state 会卡在 processing。这里显式 surface 一次让 HUD 走 error → idle。
+      if (this.state === 'processing') {
+        this.surfaceError({
+          code: 'NETWORK',
+          message: err instanceof Error ? err.message : String(err),
+          retryable: true,
+        })
+        this.provider = null
+        this.deps.notifyHotkeyDone()
+      }
     }
   }
 

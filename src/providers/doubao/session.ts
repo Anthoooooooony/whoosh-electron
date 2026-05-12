@@ -269,7 +269,12 @@ export class DoubaoSession extends EventEmitter {
       ws.on('close', onClose)
 
       ws.on('message', (data: RawData) => this.handleIncoming(data))
-      ws.on('close', () => this.handleClose())
+      ws.on('close', (code: number, reason: Buffer) => {
+        console.info(
+          `[doubao] ws closed · code=${code} reason="${reason.toString()}" state=${this.state} sent=${this.sequence}`,
+        )
+        this.handleClose()
+      })
       ws.on('error', (err) => this.handleSocketError(err))
     })
   }
@@ -319,6 +324,10 @@ export class DoubaoSession extends EventEmitter {
       this.emitError({ code: 'PROTOCOL', message: String(err), retryable: false })
       return
     }
+
+    console.info(
+      `[doubao] rx · type=0x${frame.header.messageType.toString(16)} flags=0b${frame.header.flags.toString(2).padStart(4, '0')} state=${this.state}`,
+    )
 
     if (frame.header.messageType === MessageType.SERVER_ERROR_RESPONSE) {
       const serverCode = frame.errorCode ?? -1
@@ -385,11 +394,21 @@ export class DoubaoSession extends EventEmitter {
 
   private handleClose(): void {
     if (this.state === 'closed') return
+    // streaming/finishing 中 ws 被对端关掉 → 本地无 final 帧可达，必须显式
+    // emit 'error'，否则上层 SessionOrchestrator 仅靠 finish() 的 reject 兜底
+    // 时机晚于 HUD 已切到 processing，容易表现为「卡在识别中」。
     if (this.state === 'finishing' && this.finishReject) {
       const rej = this.finishReject
       this.finishResolve = null
       this.finishReject = null
       rej(new Error('ws closed during finish'))
+      this.emit('error', { code: 'NETWORK', message: 'ws closed during finish', retryable: true })
+    } else if (this.state === 'streaming') {
+      this.emit('error', {
+        code: 'NETWORK',
+        message: 'ws closed during streaming',
+        retryable: true,
+      })
     }
     this.state = 'closed'
   }

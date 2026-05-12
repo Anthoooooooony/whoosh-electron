@@ -35,6 +35,11 @@ export interface AppWindows {
 }
 
 let windows: AppWindows | null = null
+let isAppQuitting = false
+
+export function markAppQuitting(): void {
+  isAppQuitting = true
+}
 
 export function getAppWindows(): AppWindows | null {
   return windows
@@ -103,7 +108,15 @@ export function createAllWindows(): AppWindows {
     },
   })
   settings.loadURL(rendererURL('settings'))
-  if (isDev) settings.webContents.openDevTools({ mode: 'detach' })
+  // 截获 X 按钮：dev 下默认关闭会 destroy 整个 BrowserWindow，导致 tray
+  // 再次「打开设置」时 .show() 抛 "Object has been destroyed"。改为隐藏，
+  // 让 BrowserWindow 长驻，被 tray 反复唤起。
+  settings.on('close', (e) => {
+    if (!isAppQuitting && !settings.isDestroyed()) {
+      e.preventDefault()
+      settings.hide()
+    }
+  })
 
   const onboarding = new BrowserWindow({
     width: 580,
@@ -121,6 +134,12 @@ export function createAllWindows(): AppWindows {
     },
   })
   onboarding.loadURL(rendererURL('onboarding'))
+  onboarding.on('close', (e) => {
+    if (!isAppQuitting && !onboarding.isDestroyed()) {
+      e.preventDefault()
+      onboarding.hide()
+    }
+  })
 
   windows = { audio, hud, settings, onboarding }
   return windows
