@@ -7,7 +7,7 @@ pnpm-lock.yaml
 src/native/prebuilds
 src/native/**/build
 
-# 本地 plugin / skill 安装产物，不入仓也不应被格式化
+# Vendored mattpocock skill bundles + skills-lock.json：入仓但作为外部资产不格式化
 .claude
 .agents
 skills-lock.json
