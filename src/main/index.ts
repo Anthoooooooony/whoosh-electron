@@ -19,7 +19,13 @@ import {
   startHotkeyListener,
   stopHotkeyListener,
 } from './hotkey/index.js'
-import { createAllWindows, getAppWindows, hideHudWindow, showHudOnActiveScreen } from './windows.js'
+import {
+  createAllWindows,
+  getAppWindows,
+  hideHudWindow,
+  markAppQuitting,
+  showHudOnActiveScreen,
+} from './windows.js'
 import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
 import { createTray, destroyTray } from './tray.js'
 import { startPeriodicUpdateCheck, stopPeriodicUpdateCheck } from './updater/index.js'
@@ -136,6 +142,7 @@ if (!gotLock) {
 
     const orchestrator = new SessionOrchestrator({
       getDoubaoConfig: () => buildDoubaoFromStoreOrEnv(env),
+      getInputDeviceId: () => getConfig().audio.inputDeviceId,
       getAudioWebContents: () => getAppWindows()?.audio.webContents,
       getHudWebContents: () => getAppWindows()?.hud.webContents,
       showHudWindow: () => showHudOnActiveScreen(),
@@ -192,6 +199,10 @@ if (!gotLock) {
       w?.onboarding.show()
       w?.onboarding.focus()
     }
+  })
+
+  app.on('before-quit', () => {
+    markAppQuitting()
   })
 
   app.on('will-quit', () => {

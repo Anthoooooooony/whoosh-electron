@@ -55,6 +55,7 @@ function App(): React.ReactElement {
 
   return (
     <div className="onb-body">
+      <div className="titlebar-drag" />
       <ProgressBar total={totalSteps} currentIndex={stepIndex} />
 
       {state.currentStep === 1 && <Step1Credentials onComplete={() => void completeStep(1)} />}
@@ -340,11 +341,6 @@ function Step3Accessibility({
     window.ipc.send('permission:open-system-prefs', { pane: 'accessibility' })
   }, [])
 
-  const relaunch = useCallback(() => {
-    onComplete()
-    setTimeout(() => window.ipc.send('app:relaunch'), 200)
-  }, [onComplete])
-
   return (
     <>
       <span className="onb-step-no">第 03 步 · 辅助功能（仅 macOS）</span>
@@ -361,7 +357,8 @@ function Step3Accessibility({
           <div className="perm-info">
             <span className="perm-name">辅助功能访问</span>
             <span className="perm-hint">
-              点「Open System Settings」跳转 → 勾选 whoosh → 回来点「已授权，重启」
+              点「Open System Settings」跳转 → 勾选 whoosh →
+              系统会询问是否「退出并重新打开」，确认后继续
             </span>
           </div>
           {granted ? (
@@ -371,7 +368,8 @@ function Step3Accessibility({
           )}
         </div>
         <div className="warn-callout">
-          授权完成后 app 会重启加载键盘 listener。当前进度已保存，会自动恢复到 Step 04。
+          授权后 macOS 会提示「退出并重新打开」whoosh，确认后键盘 listener
+          自动加载，回到本步骤后即可继续。
         </div>
       </div>
 
@@ -383,8 +381,8 @@ function Step3Accessibility({
           <button className="btn btn-secondary" onClick={openPrefs}>
             Open System Settings
           </button>
-          <button className="btn btn-primary" disabled={!granted} onClick={relaunch}>
-            {granted ? '已授权，重启' : '等待授权…'}
+          <button className="btn btn-primary" disabled={!granted} onClick={onComplete}>
+            {granted ? '下一步' : '等待授权…'}
           </button>
         </div>
       </div>
@@ -403,6 +401,49 @@ function Step4Trial({
   onBack: () => void
 }): React.ReactElement {
   const [text, setText] = useState('')
+  const [devices, setDevices] = useState<{ deviceId: string; label: string }[]>([])
+  const [deviceId, setDeviceId] = useState<string>('')
+
+  useEffect(() => {
+    void (async () => {
+      const cfg = await window.ipc.invoke('settings:get')
+      setDeviceId(cfg?.audio?.inputDeviceId ?? '')
+    })()
+  }, [])
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices()
+      const audioInputs = list
+        .filter((d) => d.kind === 'audioinput')
+        .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
+        .map((d) => ({ deviceId: d.deviceId, label: d.label || '未命名设备' }))
+      setDevices(audioInputs)
+    } catch (err) {
+      console.error('[onboarding] enumerateDevices failed', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshDevices()
+    navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
+  }, [refreshDevices])
+
+  const onDeviceChange = useCallback(
+    async (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const id = e.target.value
+      setDeviceId(id)
+      const label = devices.find((d) => d.deviceId === id)?.label
+      await window.ipc.invoke('settings:set', {
+        audio: {
+          inputDeviceId: id || null,
+          ...(label ? { inputDeviceLabel: label } : {}),
+        },
+      })
+    },
+    [devices],
+  )
 
   return (
     <>
@@ -415,6 +456,23 @@ function Step4Trial({
       </p>
 
       <div className="onb-content">
+        <label className="field-label" htmlFor="onb-mic">
+          麦克风
+        </label>
+        <select
+          id="onb-mic"
+          className="field-select"
+          value={deviceId}
+          onChange={(e) => void onDeviceChange(e)}
+          style={{ marginBottom: 16 }}
+        >
+          <option value="">系统默认</option>
+          {devices.map((d) => (
+            <option key={d.deviceId} value={d.deviceId}>
+              {d.label}
+            </option>
+          ))}
+        </select>
         <textarea
           className="field-textarea"
           placeholder="按住右 Option 说话，松开后文字会粘到这里 · 或直接键入"

@@ -224,13 +224,22 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleSend(Channels.APP_RELAUNCH, null, () => {
+    // dev 模式：electron-vite 持有 vite dev server，进程退出后 vite 也会关闭，
+    // app.relaunch() 拉起的新 Electron 连不上 :5173 → 空白窗口。
+    // 跳过真实退出，让 onboarding 正常推进到 Step 4；用户手动 pnpm dev 即可。
+    if (process.env['ELECTRON_RENDERER_URL']) {
+      console.info('[main] dev mode: skip app.relaunch; rerun `pnpm dev` to reload hotkey listener')
+      return
+    }
     app.relaunch()
-    app.exit(0)
+    app.quit()
   })
 }
 
-// app 重启工具（onboarding Step 3 Accessibility 授权后用）
+// app 重启工具（onboarding Step 3 Accessibility 授权后用）。
+// 必须用 app.quit() 而非 app.exit()：relaunch() 把 spawn 挂在 'quit' 事件上，
+// exit() 直接终止进程会跳过该回调，新实例不会被拉起。
 export function relaunchApp(): void {
   app.relaunch()
-  app.exit(0)
+  app.quit()
 }

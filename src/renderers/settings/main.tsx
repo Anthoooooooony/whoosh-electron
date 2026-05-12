@@ -49,6 +49,8 @@ function App(): React.ReactElement {
       const list = await navigator.mediaDevices.enumerateDevices()
       const audioInputs = list
         .filter((d) => d.kind === 'audioinput')
+        // 排除浏览器自带的 default / communications 入口：我们已有「系统默认」一项
+        .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
         .map((d) => ({ deviceId: d.deviceId, label: d.label || '未命名设备' }))
       setDevices(audioInputs)
     } catch (err) {
@@ -82,6 +84,7 @@ function App(): React.ReactElement {
 
   return (
     <div className="app">
+      <div className="titlebar-drag" />
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-brand-name">
