@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # release-please 用 GITHUB_TOKEN 推 tag，被 Actions 递归锁屏蔽 push 事件；
+  # workflow_dispatch 是显式豁免事件，可由 release-please.yml 主动唤起。
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
