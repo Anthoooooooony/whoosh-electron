@@ -2,7 +2,26 @@
 
 跨平台 AI 语音输入法。按住右 Option / 右 Alt 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦 app。
 
-历史设计快照（视觉 mock、M1→M16 实施蓝图）见 `archive/`。
+已发布到 v0.2.3，自用产品形态稳定。历史设计快照（M1→M16 实施蓝图、原始视觉 mock）见 `archive/`。
+
+---
+
+## 工作流
+
+主线：**Issue → Triage → 实现 → PR → 自动发版**。
+
+1. **Issue 起点** —— 一切需求 / bug / 想法先成 GitHub Issue（走 `to-issues` skill 或 `gh issue create`）。新 issue 默认 `needs-triage`
+2. **Triage** —— `triage` skill 把 `needs-triage` 移到下游 5 态之一：`needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`。完整 label 语义见 `docs/agents/triage-labels.md`
+3. **实现** —— `ready-for-agent` 由 AI 独立开 PR；`ready-for-human` 由人来。两者都必须：
+   - 用 Conventional Commits（commit-msg hook 把关）
+   - 推前本地 `pnpm typecheck && pnpm lint && pnpm test`
+   - 涉及领域语义/架构决策时，看 `docs/agents/domain.md` 是否引导你去读 `CONTEXT.md` / `docs/adr/`
+4. **PR + CI** —— 任何 PR 必跑 `.github/workflows/ci.yml`（typecheck / lint / format / vitest）。branch protection 强制绿才能 merge
+5. **release-please** —— main 上每次 push 都触发 release-please.yml：累积 `feat:` / `fix:` commits 维护一个待发的 release PR
+6. **发版** —— merge 那个 release PR → 自动 tag + 自动建 GitHub Release + 自动 dispatch release.yml 出 DMG（macOS arm64）+ NSIS exe（Windows x64）挂上去
+7. **上线** —— 已发布 app 内 updater 每 6h 查一次 GitHub Releases，tray 菜单角标提示用户
+
+外部资源引用约定见文末「Agent skills」节。
 
 ---
 
@@ -68,16 +87,22 @@
 - 分发：GitHub Releases，**不签名、不公证**（自用规模）
 - 更新机制：被动检查 + tray 菜单提示，不自动下载
 
+### 自动发版链路
+
+GitHub Actions 全自动，不要手动改版本号、手动打 tag、手动跑 release.yml：
+
+- `release-please.yml`（main push 触发）—— 维护下一个版本的 release PR；若该轮真的发了 release，主动 `gh workflow run release.yml --ref v$TAG`
+- `release.yml`（`push: tags` 或 `workflow_dispatch` 触发）—— macOS arm64 + Windows x64 双矩阵 build，artifacts 经 `softprops/action-gh-release@v2` 上传到对应 Release
+- `ci.yml` 同时支持 `workflow_dispatch` —— release-please.yml 会在新建/更新 release PR 时显式 dispatch 给它跑，绕过 GITHUB_TOKEN 递归锁
+
+历史经验：CI 与 release.yml 都装了 `setup-node@v4` → `corepack prepare pnpm@11.0.9` → `setup-node@v4(cache: pnpm)` 三步走，绕开 pnpm/action-setup 在 runner 自带 Node 20 上的引擎不兼容；`@electron/get` 经 pnpm overrides 锁到 `^3.1.0` 解决 electron-builder 26.x 的枚举缺失。
+
 ## Agent skills
 
-### Issue tracker
+外部 skill（mattpocock 系：`to-issues` / `triage` / `to-prd` / `qa` / `improve-codebase-architecture` / `diagnose` / `tdd` / `grill-with-docs`）通过下面三个文件理解本仓约定：
 
-GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+- **Issue tracker** —— GitHub Issues + `gh` CLI。详见 `docs/agents/issue-tracker.md`
+- **Triage labels** —— 5 态状态机：`needs-triage` → (`needs-info` | `ready-for-agent` | `ready-for-human` | `wontfix`)。映射表见 `docs/agents/triage-labels.md`，所有 label 保持 canonical 名（未重命名）
+- **Domain docs** —— 单上下文：根目录 `CONTEXT.md`（领域词汇表）+ `docs/adr/`（架构决策记录）。详见 `docs/agents/domain.md`
 
-### Triage labels
-
-Canonical defaults (no rename). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+**重要的 lazy 语义**：`CONTEXT.md` 与 `docs/adr/` 当前都不存在，这是预期状态。下游 skill 读不到时应**静默继续**，不要把缺失当 bug 报告；它们由 `grill-with-docs` 在「真有词汇需要锚定 / 真有决策需要记录」时按需创建。
