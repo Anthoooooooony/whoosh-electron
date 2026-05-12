@@ -4,11 +4,11 @@
 
 跨平台 AI 语音输入法。常驻 macOS menubar 或 Windows tray，按住右 Option / 右 Alt 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦的 app —— 任何能输入文字的 app 都能用。
 
-<!-- TODO(screenshot): docs/images/hero.png ——
-     HUD 胶囊浮窗 recording 态：左侧 mic icon + 计时器、右侧流式识别文本。
-     建议在桌面下方截屏 1600×400 区域，背景留点其它窗口体现「悬浮在所有 app 之上」。 -->
+<!-- TODO(screenshot): 把 readme-assets/hero.png 截好后丢进 readme-assets/，
+     并把下面这行的 .svg 改成 .png。
+     建议尺寸：1600×320 — HUD 胶囊浮窗 recording 态，左侧 mic icon + 计时器、右侧流式识别文本。 -->
 
-![HUD 胶囊浮窗 · recording 态](https://placehold.co/1600x320/1a1a1a/e5e5e5?text=HUD+%C2%B7+Recording+%2B+Live+Partial+Text)
+![HUD 胶囊浮窗 · recording 态](./readme-assets/hero.svg)
 
 ## 特点
 
@@ -42,11 +42,10 @@
 3. **辅助功能权限**（macOS 限定）—— 监听全局键盘 + 模拟粘贴需要 Accessibility
 4. **试用** —— 现场试一次语音输入，确认链路通
 
-<!-- TODO(screenshot): docs/images/onboarding.png ——
-     onboarding 第 1 步 API 凭据，3 个输入框 + Test Connection 按钮。
-     建议 800×560 整窗口截屏。 -->
+<!-- TODO(screenshot): readme-assets/onboarding.png — 截好后改下面行的 .svg 为 .png。
+     建议尺寸：800×560 — onboarding 第 1 步 API 凭据，3 个输入框 + Test Connection 按钮，整窗口。 -->
 
-![Onboarding · Step 1 API 凭据](https://placehold.co/800x560/1a1a1a/e5e5e5?text=Onboarding+%C2%B7+Step+1+API+Credentials)
+![Onboarding · Step 1 API 凭据](./readme-assets/onboarding.svg)
 
 ## 使用
 
@@ -58,11 +57,10 @@
 - 松开后会有短暂「识别中」状态，等流式收尾确认后才粘贴
 - 出错（麦克风占用 / 网络 / 鉴权 / 配额）会在 HUD 显示具体原因约 2s
 
-<!-- TODO(screenshot): docs/images/settings.png ——
-     主设置窗 Setup 节，左侧 5 个 sidebar tab + 右侧 form。
-     建议 800×560 整窗口截屏，深色模式更出彩。 -->
+<!-- TODO(screenshot): readme-assets/settings.png — 截好后改下面行的 .svg 为 .png。
+     建议尺寸：800×560 — 主设置窗 Setup 节，左侧 5 个 sidebar tab + 右侧 form。深色模式更出彩。 -->
 
-![设置窗 · Setup](https://placehold.co/800x560/1a1a1a/e5e5e5?text=Settings+%C2%B7+Setup)
+![设置窗 · Setup](./readme-assets/settings.svg)
 
 设置项分 5 节：Setup（设备/凭据/权限）· Provider（ASR 参数）· 行为（触发键/开机自启/HUD 开关）· 日志与隐私 · 关于。
 
