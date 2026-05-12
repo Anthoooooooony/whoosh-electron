@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.2...v0.2.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ci:** gate release PR dispatch on prs_created only ([5edc6d3](https://github.com/Anthoooooooony/whoosh-electron/commit/5edc6d3ffa8b7a7c2acbe70dd0222518948bfc90))
+* **ci:** only dispatch release PR CI when a PR was actually opened ([7deaf6c](https://github.com/Anthoooooooony/whoosh-electron/commit/7deaf6c2f5c0979a9fc519d4f9c7cf185b061294))
+
 ## [0.2.2](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.1...v0.2.2) (2026-05-12)
 
 
