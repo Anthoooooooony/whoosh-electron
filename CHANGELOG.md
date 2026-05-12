@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.0...v0.2.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ci:** chain workflows via workflow_dispatch to bypass GITHUB_TOKEN lock ([e2e4712](https://github.com/Anthoooooooony/whoosh-electron/commit/e2e471202096efb875d717fe08ea769d74255cfa))
+* **ci:** chain workflows via workflow_dispatch to bypass GITHUB_TOKEN lock ([48f27b7](https://github.com/Anthoooooooony/whoosh-electron/commit/48f27b7d1cd5ca9d795b83553de68fa801d5a7e9))
+* **ci:** pass --repo to gh workflow run ([fa40a70](https://github.com/Anthoooooooony/whoosh-electron/commit/fa40a7034716bcf713303e5d694f853e0b6c13a6))
+* **ci:** pass --repo to gh workflow run ([b39085c](https://github.com/Anthoooooooony/whoosh-electron/commit/b39085c4cedda5d86065d40b4ba74da938a9bd32))
+* **deps:** override @electron/get ^3.1.0 to unblock dmg build ([41b0951](https://github.com/Anthoooooooony/whoosh-electron/commit/41b0951e7936023ef995706694eb0b5e086d4c31))
+* **deps:** override @electron/get ^3.1.0 to unblock dmg build ([07c49d3](https://github.com/Anthoooooooony/whoosh-electron/commit/07c49d35dd79b9dbbbc79c02759eb8e72b353368))
+
 ## [0.2.0](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.1.0...v0.2.0) (2026-05-12)
 
 
