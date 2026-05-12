@@ -5,7 +5,7 @@
 //   - 之后每 6h 重复一次
 //   - 比当前 app.getVersion() 新，则把信息写到 tray 菜单 + 暴露给 settings invoke
 //
-// 不下载、不替换二进制；自用规模 + 未签名分发选定的策略（BLUEPRINT §14）。
+// 不下载、不替换二进制；自用规模 + 未签名分发选定的策略（archive/BLUEPRINT.md §14）。
 
 import { app } from 'electron'
 import { setUpdateInfo } from '../tray.js'

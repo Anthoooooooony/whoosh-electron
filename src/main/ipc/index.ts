@@ -2,9 +2,7 @@
 //
 // 设计要点：
 //   - 所有 invoke / send 入参在边界做 zod parse，校验失败直接拒绝 + 日志
-//   - M3 阶段 handler 全部是 stub（log + dummy response），后续 milestone 替换：
-//       settings: M11 / provider:test-connection: M8 (real) / permission:*: M12 / updater:check: M15 / onboarding:*: M12
-//   - audio:chunk 在 M9 由 SessionOrchestrator 消费（通过 onAudioChunk 注入回调）
+//   - audio:chunk 由 SessionOrchestrator 通过 onAudioChunk 回调消费
 //   - 注册函数 idempotent（重复调用 throw），由 main/index.ts 在 app.whenReady 之后调用一次
 
 import { app, ipcMain, shell, systemPreferences } from 'electron'

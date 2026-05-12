@@ -1,6 +1,6 @@
 // ASR Provider 抽象接口
 //
-// 设计契约见 BLUEPRINT.md §D：
+// 设计契约见 archive/BLUEPRINT.md §D：
 //   - audio 输入统一 16kHz mono s16le PCM，由 SessionOrchestrator 喂进来
 //   - 非流式 provider（Whisper 等）在 start/pushAudio 内部 buffer，finish 时一次上传
 //   - capabilities 决定 UI 行为（partial 文本是否启用、能否提前出字等）
