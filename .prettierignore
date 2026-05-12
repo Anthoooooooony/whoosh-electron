@@ -7,6 +7,11 @@ pnpm-lock.yaml
 src/native/prebuilds
 src/native/**/build
 
+# 本地 plugin / skill 安装产物，不入仓也不应被格式化
+.claude
+.agents
+skills-lock.json
+
 # 归档的设计/规划文档手工排版，prettier 会破坏 markdown 缩进与代码块
 archive
 
