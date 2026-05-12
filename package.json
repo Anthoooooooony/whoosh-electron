@@ -15,7 +15,7 @@
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:native": "NO_PROXY=* electron-rebuild --module-dir=src/native/paste --types prod,dev,optional",
+    "build:native": "electron-rebuild --module-dir=src/native/paste --types prod,dev,optional",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
