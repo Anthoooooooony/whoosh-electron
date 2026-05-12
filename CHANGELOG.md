@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.1...v0.2.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **build:** drop inline NO_PROXY env var from build:native script ([b762c0c](https://github.com/Anthoooooooony/whoosh-electron/commit/b762c0cc168241535ea464e93d6fb011ccb8ee06))
+* **build:** make build:native script cross-platform ([091b10d](https://github.com/Anthoooooooony/whoosh-electron/commit/091b10dff6c2beb092b4e9ee9bf852b9f87a5bde))
+
 ## [0.2.1](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.0...v0.2.1) (2026-05-12)
 
 
