@@ -4,12 +4,11 @@ out
 release
 .vite
 pnpm-lock.yaml
-design
 src/native/prebuilds
 src/native/**/build
 
-# 设计/规划文档手工排版，prettier 会破坏 markdown 缩进与代码块
-BLUEPRINT.md
+# 归档的设计/规划文档手工排版，prettier 会破坏 markdown 缩进与代码块
+archive
 
 # release-please 生成的 changelog，不接受手工格式化
 CHANGELOG.md

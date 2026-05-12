@@ -9,7 +9,7 @@ export default tseslint.config(
       'out',
       'release',
       'node_modules',
-      'design',
+      'archive',
       'src/native/**/build',
       'src/native/prebuilds',
       '*.config.cjs',

@@ -2,7 +2,7 @@
 
 跨平台 AI 语音输入法。按住右 Option / 右 Alt 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦 app。
 
-完整设计共识与 implementation blueprint 见 `BLUEPRINT.md`，视觉 mock 见 `design/index.html`。
+历史设计快照（视觉 mock、M1→M16 实施蓝图）见 `archive/`。
 
 ---
 
@@ -43,7 +43,7 @@
 - 新 provider 必须实现 `src/shared/types/provider.ts` 的 `ASRProvider` interface
 - Provider 独有字段（language / model / hotwords 等）放 `settingsSchema`，**不要**污染上层接口
 - 音频输入统一 16kHz mono s16le PCM；provider 内部按需转码到自家协议
-- v1 仅豆包 provider 落地，但抽象层完整；UI 上 provider dropdown v1 可暂藏
+- 目前仅落地豆包 provider，但抽象层完整可扩展；UI 上 provider dropdown 暂藏
 
 ## 隐私
 
@@ -62,15 +62,11 @@
 
 ## 构建与发布
 
-- 包管理器：**pnpm**（必须 9.x；`.npmrc` 强制 `engine-strict`）
+- 包管理器：**pnpm**（`package.json` 锁到 `pnpm@11.0.9`；`.npmrc` 强制 `engine-strict`）
 - 打包：electron-vite (dev) + electron-builder (installer)
 - Native paste addon 用 node-gyp，CI 出 prebuilt `.node`，跟 app 一起打进安装包
-- 分发：GitHub Releases，**不签名、不公证**（v1 自用规模）
+- 分发：GitHub Releases，**不签名、不公证**（自用规模）
 - 更新机制：被动检查 + tray 菜单提示，不自动下载
-
-## 实施顺序
-
-按 `BLUEPRINT.md` 的 M1 → M16 顺序推进；每个 milestone 有明确的验收标准。当前进度见 git log。
 
 ## Agent skills
 

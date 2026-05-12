@@ -1,6 +1,6 @@
 // HUD renderer · M10 完整视觉
 //
-// 视觉规范见 design/index.html（同一套 token 与 layout）。
+// 视觉规范见 archive/design/index.html（同一套 token 与 layout）。
 // 四态：recording / hover / processing / error；hover 是 UI 子态，只在 recording 时由
 // 鼠标悬停触发；其余三态来自 main 通过 hud:show 推送。
 //
