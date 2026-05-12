@@ -7,12 +7,29 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - id: rp
+        uses: googleapis/release-please-action@v4
         with:
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      - name: Dispatch release build (workaround GITHUB_TOKEN recursion lock)
+        if: ${{ steps.rp.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: gh workflow run release.yml --ref "$TAG" -f tag="$TAG"
+
+      # release PR 创建/更新后，pull_request 事件同样被递归锁屏蔽，需主动 dispatch CI。
+      - name: Dispatch CI on release PR branch
+        if: ${{ steps.rp.outputs.prs_created == 'true' || steps.rp.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: release-please--branches--main--components--whoosh-electron
+        run: gh workflow run ci.yml --ref "$BRANCH"
