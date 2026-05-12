@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.3...v0.2.4) (2026-05-12)
+
+
+### Bug Fixes
+
+* **release-please:** hide docs/refactor/perf so only feat/fix bumps ([6d21fae](https://github.com/Anthoooooooony/whoosh-electron/commit/6d21fae022f28ae1cd40dbf606734eac0d231700))
+* **release-please:** only feat/fix should bump version ([0639817](https://github.com/Anthoooooooony/whoosh-electron/commit/0639817448243afab944426a7721da7f6f1e2eb8))
+
 ## [0.2.3](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.2...v0.2.3) (2026-05-12)
 
 
