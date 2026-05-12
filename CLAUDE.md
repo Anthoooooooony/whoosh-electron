@@ -29,7 +29,12 @@
 
 - **必须**使用 [Conventional Commits](https://www.conventionalcommits.org)，由 `commitlint` 强制；不通过的 commit 会在 `commit-msg` hook 被拒
 - 版本号与 `CHANGELOG.md` 由 `release-please` 自动生成 —— 不要手动改 `package.json` 里的 `version`
-- `feat:` / `fix:` 触发版本 bump；`chore:` / `docs:` / `refactor:` 等不 bump
+- **仅允许三种 type**（commitlint 在本仓库收窄了 `@commitlint/config-conventional` 的默认枚举）：
+  - `feat:` 新功能 → minor bump
+  - `fix:` 一切非新功能的代码改动（修 bug / 重构 / 性能 / 依赖 / 构建 / CI / 测试 / 工具配置）→ patch bump
+  - `docs:` 纯文档与注释（README / `docs/` / 内嵌注释）→ 不 bump
+- 不再使用 `chore` / `refactor` / `perf` / `test` / `ci` / `style` / `build` / `revert` —— 这些在 release-please 默认下不 bump，与"代码改动均发版"的本仓约定冲突
+- **dependabot 例外**：dependabot 自动 PR 仍会带 `chore(deps):` —— 不要直接 merge，按 PR #33 的流程 cherry-pick 改写成 `fix(deps): ...` 再发新 PR，让 release-please 接得到
 
 ## TypeScript
 
