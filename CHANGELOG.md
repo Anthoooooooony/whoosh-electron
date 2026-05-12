@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.5](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.4...v0.2.5) (2026-05-12)
+
+
+### Bug Fixes
+
+* **deps:** bump ejs from 3.1.8 to 3.1.10 ([9742f78](https://github.com/Anthoooooooony/whoosh-electron/commit/9742f7864d6652e0adc751cccebc81e82a0ab776))
+* **deps:** bump ejs from 3.1.8 to 3.1.10 ([b605686](https://github.com/Anthoooooooony/whoosh-electron/commit/b6056860b1bbe1d3543393fcd2798250d1a38c5a))
+* **release:** only bump on code change, restrict commit types to feat/fix/docs ([f080e81](https://github.com/Anthoooooooony/whoosh-electron/commit/f080e81472ff07d90be74813283699643e8d1bbe))
+* **release:** only bump on code change, restrict types to feat/fix/docs ([3f1c429](https://github.com/Anthoooooooony/whoosh-electron/commit/3f1c42925755647df20185ad6725e9e14af0cb2c))
+
 ## [0.2.4](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.3...v0.2.4) (2026-05-12)
 
 
