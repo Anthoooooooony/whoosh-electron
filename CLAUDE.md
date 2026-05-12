@@ -71,3 +71,17 @@
 ## 实施顺序
 
 按 `BLUEPRINT.md` 的 M1 → M16 顺序推进；每个 milestone 有明确的验收标准。当前进度见 git log。
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical defaults (no rename). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
