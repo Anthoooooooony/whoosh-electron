@@ -8,3 +8,6 @@ allowBuilds:
 # transitive vulnerabilities 强制升级
 overrides:
   yaml: ^2.8.3
+  # electron-builder 26.8.1 CJS require('@electron/get') 拿 ElectronDownloadCacheMode
+  # 枚举，但 ^3.0.0 范围会解析到 3.0.0 缺该 enum 导致打包失败；锁到 3.1.0+。
+  '@electron/get': ^3.1.0
