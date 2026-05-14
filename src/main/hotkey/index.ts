@@ -1,6 +1,7 @@
-// uiohook 全局键盘监听 → 过滤右 Option/右 Alt → 喂 HotkeyFSM → 通知 orchestrator
+// uiohook 全局键盘监听 → 喂 HotkeyListener → 通知 orchestrator
 //
-// 副作用层；纯逻辑见 fsm.ts。
+// 副作用壳：只负责绑 uIOhook 与 app lifecycle。事件路由逻辑见 listener.ts，
+// 纯状态机见 fsm.ts。
 //
 // 触发键：UiohookKey.AltRight（uiohook-napi 抽象后的"右 Alt"）。
 //   - macOS: rawcode 0x3D (kVK_RightOption)
@@ -9,10 +10,12 @@
 // Accessibility 未授权时 uIOhook.start() 会抛异常 —— try-catch 兜底，不让 app 起不来。
 
 import { UiohookKey, uIOhook } from 'uiohook-napi'
-import { createHotkeyFSM, type HotkeyAction, type HotkeyFSM } from './fsm.js'
+import type { HotkeyAction } from './fsm.js'
+import { createHotkeyListener, type HotkeyListener } from './listener.js'
 
 let started = false
-let fsm: HotkeyFSM | null = null
+let listener: HotkeyListener | null = null
+// 可换的转发目标 —— listener 的 onAction 是它的稳定闭包，重复 start 时只换这里
 let actionListener: ((action: HotkeyAction) => void) | null = null
 
 /**
@@ -21,56 +24,31 @@ let actionListener: ((action: HotkeyAction) => void) | null = null
  *
  * @param onAction 每当 FSM 派发非 null 的 action 时调用一次（START_RECORDING /
  *                 COMMIT_RECORDING / ABORT_SHORT / ABORT_CANCEL / DONE）
+ * @returns ok=false 表示 uIOhook.start() 抛异常（多半是 Accessibility 未授权）
  */
-export function startHotkeyListener(onAction: (action: HotkeyAction) => void): {
-  fsm: HotkeyFSM
-  ok: boolean
-} {
-  if (started && fsm) {
-    actionListener = onAction
-    return { fsm, ok: true }
-  }
-
-  fsm = createHotkeyFSM()
+export function startHotkeyListener(onAction: (action: HotkeyAction) => void): { ok: boolean } {
   actionListener = onAction
+  if (started && listener) return { ok: true }
 
-  // 调试用：记录按下时刻以便日志里打出按住时长（M14 menubar/tray 上线后或可裁掉）
-  let pressDownTs: number | null = null
-
-  uIOhook.on('keydown', (e) => {
-    if (e.keycode !== UiohookKey.AltRight) return
-    const ts = Date.now()
-    pressDownTs ??= ts
-    const action = fsm!.send({ type: 'KEY_DOWN', ts })
-    if (action) {
-      console.info(`[hotkey] ${action}`)
-      actionListener?.(action)
-    }
+  listener = createHotkeyListener({
+    targetKeycode: UiohookKey.AltRight,
+    onAction: (action) => actionListener?.(action),
   })
 
-  uIOhook.on('keyup', (e) => {
-    if (e.keycode !== UiohookKey.AltRight) return
-    const ts = Date.now()
-    const heldMs = pressDownTs !== null ? ts - pressDownTs : -1
-    pressDownTs = null
-    const action = fsm!.send({ type: 'KEY_UP', ts })
-    if (action) {
-      console.info(`[hotkey] ${action} (held ${heldMs}ms)`)
-      actionListener?.(action)
-    }
-  })
+  uIOhook.on('keydown', (e) => listener!.keyDown(e.keycode, Date.now()))
+  uIOhook.on('keyup', (e) => listener!.keyUp(e.keycode, Date.now()))
 
   try {
     uIOhook.start()
     started = true
-    return { fsm, ok: true }
+    return { ok: true }
   } catch (err) {
     console.warn(
       '[hotkey] uIOhook.start() failed —— Accessibility 权限可能未授予。' +
         ' 主面板会在设置阶段引导授权再重试。',
       err,
     )
-    return { fsm, ok: false }
+    return { ok: false }
   }
 }
 
@@ -79,12 +57,7 @@ export function startHotkeyListener(onAction: (action: HotkeyAction) => void): {
  * 让 FSM 从 processing/canceling 态回到 idle。
  */
 export function dispatchSessionDone(): void {
-  if (!fsm) return
-  const action = fsm.send({ type: 'SESSION_DONE' })
-  if (action) {
-    console.info(`[hotkey] ${action}`)
-    actionListener?.(action)
-  }
+  listener?.sessionDone()
 }
 
 /**
@@ -92,12 +65,7 @@ export function dispatchSessionDone(): void {
  * recording 态会转为 canceling 并 emit ABORT_CANCEL。
  */
 export function dispatchCancelClick(): void {
-  if (!fsm) return
-  const action = fsm.send({ type: 'CANCEL_CLICK' })
-  if (action) {
-    console.info(`[hotkey] ${action} (via HUD)`)
-    actionListener?.(action)
-  }
+  listener?.cancelClick()
 }
 
 export function stopHotkeyListener(): void {
@@ -108,9 +76,4 @@ export function stopHotkeyListener(): void {
     // 进程退出阶段 stop 抛异常不影响关闭
   }
   started = false
-}
-
-/** 供 main/index.ts 之外（如 orchestrator）取 FSM 实例派发 SESSION_DONE/ERROR */
-export function getHotkeyFSM(): HotkeyFSM | null {
-  return fsm
 }

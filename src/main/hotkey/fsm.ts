@@ -46,7 +46,7 @@ export const SHORT_PRESS_THRESHOLD_MS = 300
 export interface HotkeyFSM {
   send(event: HotkeyEvent): HotkeyAction | null
   getState(): HotkeyState
-  /** 仅供测试 inspect 内部时间戳；上层不应依赖 */
+  /** 暴露内部 pressStartTs：测试 inspect + listener 算 heldMs 调试日志用；不要在此之上建行为 */
   getPressStartTs(): number | null
 }
 
