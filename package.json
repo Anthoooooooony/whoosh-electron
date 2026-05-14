@@ -1,6 +1,6 @@
 {
   "name": "whoosh-electron",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "description": "AI 语音输入法 · 按住右 Option 录音、松开粘贴 · 基于豆包 Seed ASR",
   "type": "module",
