@@ -2,7 +2,7 @@
 
 按住 → 说话 → 松开 → 文字落到你正在打字的地方。
 
-跨平台 AI 语音输入法。常驻 macOS menubar 或 Windows tray，按住右 Option / 右 Alt 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦的 app —— 任何能输入文字的 app 都能用。
+跨平台 AI 语音输入法。常驻 macOS menubar 或 Windows tray，按住右 Option / 右 Ctrl 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦的 app —— 任何能输入文字的 app 都能用。
 
 ![HUD 胶囊浮窗 · recording 态](./readme-assets/hud.png)
 
@@ -40,7 +40,7 @@
 
 ## 使用
 
-按住 **右 Option**（macOS）或 **右 Alt**（Windows） → 说话 → 松开。HUD 出现在屏幕底部中央，松开后识别结果会自动粘贴到当前聚焦的输入框。
+按住 **右 Option**（macOS）或 **右 Ctrl**（Windows） → 说话 → 松开。HUD 出现在屏幕底部中央，松开后识别结果会自动粘贴到当前聚焦的输入框。
 
 操作小贴士：
 

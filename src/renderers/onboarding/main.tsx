@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { initI18n } from '@shared/i18n/index.js'
+import { triggerKeyLabel } from '@shared/trigger-key.js'
 
 initI18n()
 
@@ -67,6 +68,7 @@ function App(): React.ReactElement {
       )}
       {state.currentStep === 4 && (
         <Step4Trial
+          platform={state.platform}
           onComplete={() => void completeStep(4)}
           onBack={() => goToStep(state.platform === 'darwin' ? 3 : 2)}
         />
@@ -394,9 +396,11 @@ function Step3Accessibility({
    Step 4: Trial
    ─────────────────────────────────────────────────────────── */
 function Step4Trial({
+  platform,
   onComplete,
   onBack,
 }: {
+  platform: Platform
   onComplete: () => void
   onBack: () => void
 }): React.ReactElement {
@@ -452,7 +456,7 @@ function Step4Trial({
         说一句，或<em>敲</em>一句
       </h3>
       <p className="onb-desc">
-        按住右 Option 说话试试，或直接键盘输入。任意非空文本即可完成首次设置。
+        按住{triggerKeyLabel(platform)}说话试试，或直接键盘输入。任意非空文本即可完成首次设置。
       </p>
 
       <div className="onb-content">
@@ -475,7 +479,7 @@ function Step4Trial({
         </select>
         <textarea
           className="field-textarea"
-          placeholder="按住右 Option 说话，松开后文字会粘到这里 · 或直接键入"
+          placeholder={`按住${triggerKeyLabel(platform)}说话，松开后文字会粘到这里 · 或直接键入`}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />

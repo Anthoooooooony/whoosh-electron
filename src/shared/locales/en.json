@@ -25,7 +25,7 @@
       "logs": "Logs & Privacy",
       "about": "About"
     },
-    "footer": "Listening · Right ⌥",
+    "footer": "Listening · {{triggerKey}}",
     "setup": {
       "title": "Setup",
       "desc": "Microphone, API credentials, and system permission status.",
@@ -139,8 +139,8 @@
     "step4": {
       "label": "Step 04 · Try it",
       "title": "Speak or type",
-      "desc": "Hold Right Option and speak, or type directly. Any non-empty text finishes the setup.",
-      "placeholder": "Hold Right Option to speak — text will paste here · or type directly",
+      "desc": "Hold {{triggerKey}} and speak, or type directly. Any non-empty text finishes the setup.",
+      "placeholder": "Hold {{triggerKey}} to speak — text will paste here · or type directly",
       "charCount": "{{count}} chars"
     }
   },

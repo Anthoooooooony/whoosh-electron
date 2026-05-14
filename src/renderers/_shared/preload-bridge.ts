@@ -46,4 +46,6 @@ function createIpcApi(): IpcApi {
 
 export function exposeIpcBridge(): void {
   contextBridge.exposeInMainWorld('ipc', createIpcApi())
+  // 静态环境信息：renderer 据此分叉平台相关 UI（如触发键文案）
+  contextBridge.exposeInMainWorld('platform', process.platform)
 }
