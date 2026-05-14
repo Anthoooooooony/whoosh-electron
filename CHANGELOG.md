@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.6](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.5...v0.2.6) (2026-05-14)
+
+
+### Bug Fixes
+
+* **audio:** extract pure resampler from the worklet, fix bridge capture race ([d41022e](https://github.com/Anthoooooooony/whoosh-electron/commit/d41022e6b333ba6629347248e8c0a27feb58dbb1))
+* **audio:** extract pure resampler from the worklet, fix bridge capture race ([71fb709](https://github.com/Anthoooooooony/whoosh-electron/commit/71fb7091edd9eda02fdd7bef0cb976cb35cfa7fd))
+* **audio:** transpile worklet via ?worker&url so packaged apps can record ([62a2a5a](https://github.com/Anthoooooooony/whoosh-electron/commit/62a2a5a2c358e1b3c9b687d4da5618888d01b76b))
+* **audio:** transpile worklet via ?worker&url so packaged apps can record ([97134d5](https://github.com/Anthoooooooony/whoosh-electron/commit/97134d54c346c52965f0631cfab9822bfbe91ce5))
+* **doubao:** concentrate provider config resolution into one module ([a27cd41](https://github.com/Anthoooooooony/whoosh-electron/commit/a27cd412fcbb6754ee2f723887dce671fe3cdb1c))
+* **doubao:** concentrate provider config resolution into one module ([7749c0b](https://github.com/Anthoooooooony/whoosh-electron/commit/7749c0bbcb805ca77d8f8237c4af8026f37f770d))
+* **hotkey:** extract pure event-router from the uiohook shell ([07653f1](https://github.com/Anthoooooooony/whoosh-electron/commit/07653f1d8ba3e99ee45590de07db48ebbcd67285))
+* **hotkey:** extract pure event-router from the uiohook shell ([cc93bc4](https://github.com/Anthoooooooony/whoosh-electron/commit/cc93bc4b9e9a4dcadb7acfc206f9bdf93bad6eb7))
+* **orchestrator:** relocate seam to typed ports so the interface is the test surface ([ec2e85c](https://github.com/Anthoooooooony/whoosh-electron/commit/ec2e85c85147a4fb870073943750abb69130048a))
+* **orchestrator:** relocate seam to typed ports so the interface is the test surface ([62a3e68](https://github.com/Anthoooooooony/whoosh-electron/commit/62a3e6867b25e0d8e27fe2701c47b643e4851d8e))
+
 ## [0.2.5](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.4...v0.2.5) (2026-05-12)
 
 
