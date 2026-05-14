@@ -23,7 +23,6 @@ import {
   SessionErrorSchema,
   SessionFinalSchema,
   SessionPartialSchema,
-  SessionStateUpdateSchema,
   SetDeviceSchema,
   SettingsGetApikeyResultSchema,
   SettingsGetApikeySchema,
@@ -108,7 +107,6 @@ export interface BroadcastContract {
   [Channels.AUDIO_STOP]: void
   [Channels.AUDIO_ABORT]: void
 
-  [Channels.SESSION_STATE]: z.infer<typeof SessionStateUpdateSchema>
   [Channels.SESSION_PARTIAL]: z.infer<typeof SessionPartialSchema>
   [Channels.SESSION_FINAL]: z.infer<typeof SessionFinalSchema>
   [Channels.SESSION_ERROR]: z.infer<typeof SessionErrorSchema>
