@@ -1,7 +1,7 @@
 // AudioWorklet processor —— 麦克风 float32 → 16kHz mono s16le PCM
 //
 // 设计要点：
-//   - AudioWorklet 的 process() 每 128 帧调用一次（约 2.67ms @ 48k）；我们攒到 40ms
+//   - AudioWorklet 的 process() 每 128 帧调用一次（约 2.67ms @ 48k）；攒到 40ms
 //     才下采样并 postMessage，减少 IPC 频次（25 chunks/s @ 40ms）。
 //   - 下采样用线性插值（v1 简化方案）。对 ASR 而言 16kHz 已远高于人声 8kHz 带宽，
 //     不需要精确低通滤波；若实测识别率下降再补 FIR + decimation。
@@ -9,8 +9,10 @@
 //     喂 IPC，无需额外拷贝。
 //   - 单声道：若 mic 输出立体声，只取 channel 0。
 //
-// AudioWorkletGlobalScope 提供 globalThis.sampleRate（输入采样率）和
-// globalThis.registerProcessor。
+// 结构：纯 DSP 在 createResampler（可被 resampler.test.ts 直接 import 测）；
+//       DownsampleProcessor 是绑定 AudioWorkletGlobalScope 的薄壳。
+// AudioWorkletGlobalScope 提供 globalThis.sampleRate（输入采样率）、
+// globalThis.AudioWorkletProcessor 和 globalThis.registerProcessor。
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const sampleRate: number
@@ -20,58 +22,79 @@ const OUTPUT_SAMPLE_RATE = 16000
 const CHUNK_MS = 40
 const FRAMES_PER_CHUNK_OUTPUT = (OUTPUT_SAMPLE_RATE * CHUNK_MS) / 1000 // 640
 
-class DownsampleProcessor extends (globalThis as any).AudioWorkletProcessor {
-  private readonly inputSampleRate: number
-  private readonly framesPerChunkInput: number
-  private buffer: Float32Array
-  private bufferLen = 0
+export interface Resampler {
+  /**
+   * 累积输入帧；每攒满一个 40ms 输入块就下采样出一个 640-sample 的 16kHz s16le chunk。
+   * 单次 push 可能产出 0、1 或多个 chunk；尾部不足一块的残留留到下次 push。
+   */
+  push(frames: Float32Array): Int16Array[]
+}
 
-  constructor() {
-    super()
-    this.inputSampleRate = sampleRate
-    this.framesPerChunkInput = Math.round((this.inputSampleRate * CHUNK_MS) / 1000)
-    this.buffer = new Float32Array(this.framesPerChunkInput)
-  }
+/** 纯下采样器 —— 不依赖任何 worklet 全局，可在普通环境（含 vitest）构造与测试 */
+export function createResampler(inputSampleRate: number): Resampler {
+  const framesPerChunkInput = Math.round((inputSampleRate * CHUNK_MS) / 1000)
+  const buffer = new Float32Array(framesPerChunkInput)
+  let bufferLen = 0
 
-  process(inputs: Float32Array[][]): boolean {
-    const input = inputs[0]
-    if (!input || input.length === 0) return true
-    const channel = input[0]
-    if (!channel || channel.length === 0) return true
-
-    let consumed = 0
-    while (consumed < channel.length) {
-      const need = this.framesPerChunkInput - this.bufferLen
-      const take = Math.min(need, channel.length - consumed)
-      this.buffer.set(channel.subarray(consumed, consumed + take), this.bufferLen)
-      this.bufferLen += take
-      consumed += take
-
-      if (this.bufferLen >= this.framesPerChunkInput) {
-        this.emitChunk()
-        this.bufferLen = 0
-      }
-    }
-    return true
-  }
-
-  private emitChunk(): void {
+  function downsampleBuffer(): Int16Array {
     const out = new Int16Array(FRAMES_PER_CHUNK_OUTPUT)
-    const ratio = this.framesPerChunkInput / FRAMES_PER_CHUNK_OUTPUT
+    const ratio = framesPerChunkInput / FRAMES_PER_CHUNK_OUTPUT
     for (let i = 0; i < FRAMES_PER_CHUNK_OUTPUT; i++) {
       const srcIdx = i * ratio
       const srcLow = Math.floor(srcIdx)
-      const srcHigh = Math.min(srcLow + 1, this.framesPerChunkInput - 1)
+      const srcHigh = Math.min(srcLow + 1, framesPerChunkInput - 1)
       const frac = srcIdx - srcLow
-      const a = this.buffer[srcLow] ?? 0
-      const b = this.buffer[srcHigh] ?? 0
+      const a = buffer[srcLow] ?? 0
+      const b = buffer[srcHigh] ?? 0
       const sample = a * (1 - frac) + b * frac
       const clamped = sample > 1 ? 1 : sample < -1 ? -1 : sample
       out[i] = Math.round(clamped * 32767)
     }
-    // 传 ArrayBuffer + transfer，零拷贝
-    ;(this as any).port.postMessage(out.buffer, [out.buffer])
+    return out
+  }
+
+  return {
+    push(frames: Float32Array): Int16Array[] {
+      const chunks: Int16Array[] = []
+      let consumed = 0
+      while (consumed < frames.length) {
+        const need = framesPerChunkInput - bufferLen
+        const take = Math.min(need, frames.length - consumed)
+        buffer.set(frames.subarray(consumed, consumed + take), bufferLen)
+        bufferLen += take
+        consumed += take
+
+        if (bufferLen >= framesPerChunkInput) {
+          chunks.push(downsampleBuffer())
+          bufferLen = 0
+        }
+      }
+      return chunks
+    },
   }
 }
 
-registerProcessor('downsample-processor', DownsampleProcessor)
+// ↓ 仅在 AudioWorkletGlobalScope 有意义。vitest 直接 import 本文件取 createResampler 时，
+//   globalThis.AudioWorkletProcessor / registerProcessor 不存在 —— 用空基类兜底、跳过注册，
+//   使 class 定义不抛、import 不触发 worklet 注册。
+const WorkletProcessorBase: { new (): { readonly port: MessagePort } } =
+  (globalThis as any).AudioWorkletProcessor ?? class {}
+
+class DownsampleProcessor extends WorkletProcessorBase {
+  private readonly resampler = createResampler(sampleRate)
+
+  process(inputs: Float32Array[][]): boolean {
+    const channel = inputs[0]?.[0]
+    if (channel && channel.length > 0) {
+      for (const chunk of this.resampler.push(channel)) {
+        // 传 ArrayBuffer + transfer，零拷贝
+        this.port.postMessage(chunk.buffer, [chunk.buffer])
+      }
+    }
+    return true
+  }
+}
+
+if (typeof registerProcessor !== 'undefined') {
+  registerProcessor('downsample-processor', DownsampleProcessor)
+}
