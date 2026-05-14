@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.6...v0.2.7) (2026-05-14)
+
+
+### Bug Fixes
+
+* **hotkey:** use right Ctrl as the Windows trigger key ([2988a74](https://github.com/Anthoooooooony/whoosh-electron/commit/2988a74e9beaf4c4e09bc94002ceabd93f4d0b0d))
+* **hotkey:** use right Ctrl as the Windows trigger key ([#44](https://github.com/Anthoooooooony/whoosh-electron/issues/44)) ([699415e](https://github.com/Anthoooooooony/whoosh-electron/commit/699415e1eb4d61a614fd3d1ec67c54d256b22f49))
+
 ## [0.2.6](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.5...v0.2.6) (2026-05-14)
 
 
