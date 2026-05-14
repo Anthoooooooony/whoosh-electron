@@ -10,6 +10,8 @@ import type { IpcApi } from '@shared/ipc/types.js'
 declare global {
   interface Window {
     ipc: IpcApi
+    /** 由 preload 注入的静态平台标识，用于平台相关 UI 分叉 */
+    platform: 'darwin' | 'win32' | 'linux'
   }
 }
 

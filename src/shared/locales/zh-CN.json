@@ -25,7 +25,7 @@
       "logs": "日志与隐私",
       "about": "关于"
     },
-    "footer": "监听中 · 右 ⌥",
+    "footer": "监听中 · {{triggerKey}}",
     "setup": {
       "title": "基础",
       "desc": "麦克风设备、API 凭据与系统权限状态。",
@@ -139,8 +139,8 @@
     "step4": {
       "label": "第 04 步 · 试用",
       "title": "说一句，或敲一句",
-      "desc": "按住右 Option 说话试试，或直接键盘输入。任意非空文本即可完成首次设置。",
-      "placeholder": "按住右 Option 说话，松开后文字会粘到这里 · 或直接键入",
+      "desc": "按住{{triggerKey}}说话试试，或直接键盘输入。任意非空文本即可完成首次设置。",
+      "placeholder": "按住{{triggerKey}}说话，松开后文字会粘到这里 · 或直接键入",
       "charCount": "已输入 {{count}} 字"
     }
   },

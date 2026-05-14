@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { initI18n } from '@shared/i18n/index.js'
+import { triggerKeyLabel } from '@shared/trigger-key.js'
 
 initI18n()
 
@@ -112,7 +113,7 @@ function App(): React.ReactElement {
         ))}
         <div className="sidebar-footer">
           <span className="dot-listen" />
-          <span>监听中 · 右 ⌥</span>
+          <span>监听中 · {triggerKeyLabel(window.platform)}</span>
         </div>
       </aside>
 
@@ -470,9 +471,9 @@ function BehaviorPane({ config, updateConfig }: BehaviorPaneProps): React.ReactE
               <span className="row-hint">长按录音，松开完成。当前版本不支持自定义。</span>
             </div>
             <div className="row-control">
-              <span className="kbd">⌥</span>
+              <span className="kbd">{window.platform === 'darwin' ? '⌥' : 'Ctrl'}</span>
               <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                右 Option（macOS）/ 右 Alt（Windows）
+                右 Option（macOS）/ 右 Ctrl（Windows）
               </span>
             </div>
           </div>

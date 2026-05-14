@@ -1,6 +1,6 @@
 # whoosh-electron · 项目协作规范
 
-跨平台 AI 语音输入法。按住右 Option / 右 Alt 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦 app。
+跨平台 AI 语音输入法。按住右 Option / 右 Ctrl 录音，松开后流式 ASR 出文本，一次性粘贴到当前聚焦 app。
 
 已发布到 v0.2.3，自用产品形态稳定。历史设计快照（M1→M16 实施蓝图、原始视觉 mock）见 `archive/`。
 
@@ -79,7 +79,7 @@
 ## 跨平台
 
 - macOS：menubar icon（`LSUIElement=true`），无 dock；Windows：systray icon，无 taskbar 入口
-- 触发键：右 Option（macOS rawcode `0x3D`）/ 右 Alt（Windows `VK_RMENU`）
+- 触发键：右 Option（macOS rawcode `0x3D`）/ 右 Ctrl（Windows `VK_RCONTROL`）—— Windows 上单独按右 Alt 会激活窗口菜单栏（issue #44），故用右 Ctrl
 - macOS 需 Accessibility 权限才能监听全局键盘 + 模拟粘贴；Windows 无此权限要求
 - Onboarding 在 Windows 上跳过 Step 3（Accessibility），从 4 步变 3 步
 - 路径 label：`~/Library/Logs/whoosh/main.log` (macOS) / `%APPDATA%\whoosh\logs\main.log` (Windows)

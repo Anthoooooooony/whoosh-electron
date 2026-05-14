@@ -3,9 +3,11 @@
 // 副作用壳：只负责绑 uIOhook 与 app lifecycle。事件路由逻辑见 listener.ts，
 // 纯状态机见 fsm.ts。
 //
-// 触发键：UiohookKey.AltRight（uiohook-napi 抽象后的"右 Alt"）。
-//   - macOS: rawcode 0x3D (kVK_RightOption)
-//   - Windows: rawcode 0xA5 (VK_RMENU)
+// 触发键按平台分叉：
+//   - macOS: UiohookKey.AltRight —— 右 Option（rawcode 0x3D / kVK_RightOption）
+//   - Windows: UiohookKey.CtrlRight —— 右 Ctrl（rawcode 0xA3 / VK_RCONTROL）
+// Windows 上单独按右 Alt 会激活聚焦窗口的菜单栏（issue #44），且右 Alt 在国际键盘
+// 布局上常是 AltGr，故 Windows 改用右 Ctrl —— 单独按下无系统级语义。
 //
 // Accessibility 未授权时 uIOhook.start() 会抛异常 —— try-catch 兜底，不让 app 起不来。
 
@@ -31,7 +33,7 @@ export function startHotkeyListener(onAction: (action: HotkeyAction) => void): {
   if (started && listener) return { ok: true }
 
   listener = createHotkeyListener({
-    targetKeycode: UiohookKey.AltRight,
+    targetKeycode: process.platform === 'darwin' ? UiohookKey.AltRight : UiohookKey.CtrlRight,
     onAction: (action) => actionListener?.(action),
   })
 
