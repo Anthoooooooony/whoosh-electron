@@ -8,6 +8,10 @@
 //      经 window.ipc.send('audio:chunk') 推回 main
 //
 // 注意：AudioWorkletNode 故意不 connect 到 ctx.destination —— 避免把麦克风回放出来。
+//
+// 并发：startCapture / stopCapture 用 pending promise 串行化。`active` 在 startCapture
+// 末尾才置位，若不串行化，短按场景（START 后 50ms 内就 ABORT）的两次调用会各开一套
+// getUserMedia + AudioContext，先完成的那套无人 stop 而泄漏。
 
 // Vite 把 worklet 文件单独打成 chunk，?url 后缀拿到运行时 URL
 import workletUrl from './worklet/processor.ts?url'
@@ -17,13 +21,10 @@ interface CaptureSession {
 }
 
 let active: CaptureSession | null = null
+// 在途的 start/stop —— 入口同步读它即拿到护栏，避免 active 晚置位带来的并发竞态
+let pending: Promise<void> | null = null
 
-export async function startCapture(deviceId: string | null): Promise<void> {
-  if (active) {
-    console.warn('[audio] startCapture called while active; stopping previous')
-    await active.stop()
-  }
-
+async function openCaptureSession(deviceId: string | null): Promise<CaptureSession> {
   const constraints: MediaStreamConstraints = {
     audio: deviceId
       ? { deviceId: { exact: deviceId } }
@@ -56,7 +57,7 @@ export async function startCapture(deviceId: string | null): Promise<void> {
     `[audio] capture started · inputRate=${ctx.sampleRate}Hz · deviceId=${deviceId ?? 'default'}`,
   )
 
-  active = {
+  return {
     async stop(): Promise<void> {
       node.port.onmessage = null
       node.disconnect()
@@ -68,13 +69,37 @@ export async function startCapture(deviceId: string | null): Promise<void> {
   }
 }
 
-export async function stopCapture(): Promise<void> {
-  if (!active) return
-  const s = active
-  active = null
-  await s.stop()
+export async function startCapture(deviceId: string | null): Promise<void> {
+  // 等任何在途的 start/stop 落定，再判 active —— 杜绝并发开多套 pipeline
+  if (pending) await pending
+  if (active) {
+    console.warn('[audio] startCapture called while active; stopping previous')
+    await stopCapture()
+  }
+
+  const task = openCaptureSession(deviceId).then((session) => {
+    active = session
+  })
+  pending = task
+  try {
+    await task
+  } finally {
+    pending = null
+  }
 }
 
-export function isCapturing(): boolean {
-  return active !== null
+export async function stopCapture(): Promise<void> {
+  // 若有在途的 start，先等它落定，确保停的是真实建好的 session
+  if (pending) await pending
+  if (!active) return
+  const session = active
+  active = null
+
+  const task = session.stop()
+  pending = task
+  try {
+    await task
+  } finally {
+    pending = null
+  }
 }
