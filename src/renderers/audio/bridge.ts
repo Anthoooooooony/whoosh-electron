@@ -13,8 +13,9 @@
 // 末尾才置位，若不串行化，短按场景（START 后 50ms 内就 ABORT）的两次调用会各开一套
 // getUserMedia + AudioContext，先完成的那套无人 stop 而泄漏。
 
-// Vite 把 worklet 文件单独打成 chunk，?url 后缀拿到运行时 URL
-import workletUrl from './worklet/processor.ts?url'
+// Vite 的 worker 管线会转译 + 打包 processor.ts 成独立 chunk，?worker&url 拿到它的 URL。
+// 用 ?url 会把 .ts 当静态资源不转译，打包后 addModule 拿到原始 TS 直接 SyntaxError（见 #41）。
+import workletUrl from './worklet/processor.ts?worker&url'
 
 interface CaptureSession {
   stop(): Promise<void>
