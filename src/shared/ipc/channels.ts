@@ -16,7 +16,6 @@ export const Channels = {
   AUDIO_ABORT: 'audio:abort', // broadcast
 
   // 会话
-  SESSION_STATE: 'session:state', // broadcast
   SESSION_PARTIAL: 'session:partial', // broadcast: main → hud
   SESSION_FINAL: 'session:final', // broadcast: main → hud
   SESSION_ERROR: 'session:error', // broadcast: main → hud

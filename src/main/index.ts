@@ -11,21 +11,17 @@ import { app, session } from 'electron'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DoubaoProvider, type DoubaoProviderConfig } from '@providers/doubao/index.js'
+import { pasteText } from '@native/paste/index.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { SessionOrchestrator } from './orchestrator/index.js'
+import { createAudioRendererAdapter, createHudAdapter } from './orchestrator/adapters.js'
 import {
   dispatchCancelClick,
   dispatchSessionDone,
   startHotkeyListener,
   stopHotkeyListener,
 } from './hotkey/index.js'
-import {
-  createAllWindows,
-  getAppWindows,
-  hideHudWindow,
-  markAppQuitting,
-  showHudOnActiveScreen,
-} from './windows.js'
+import { createAllWindows, getAppWindows, markAppQuitting } from './windows.js'
 import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
 import { createTray, destroyTray } from './tray.js'
 import { startPeriodicUpdateCheck, stopPeriodicUpdateCheck } from './updater/index.js'
@@ -141,12 +137,13 @@ if (!gotLock) {
     if (hasEnvCreds) console.info('[main] Doubao credentials loaded from .env (dev override)')
 
     const orchestrator = new SessionOrchestrator({
-      getDoubaoConfig: () => buildDoubaoFromStoreOrEnv(env),
-      getInputDeviceId: () => getConfig().audio.inputDeviceId,
-      getAudioWebContents: () => getAppWindows()?.audio.webContents,
-      getHudWebContents: () => getAppWindows()?.hud.webContents,
-      showHudWindow: () => showHudOnActiveScreen(),
-      hideHudWindow: () => hideHudWindow(),
+      getProvider: () => {
+        const config = buildDoubaoFromStoreOrEnv(env)
+        return config ? new DoubaoProvider(config) : null
+      },
+      hud: createHudAdapter(getAppWindows),
+      audio: createAudioRendererAdapter(getAppWindows, getConfig),
+      paste: (text) => pasteText(text),
       notifyHotkeyDone: () => dispatchSessionDone(),
     })
 

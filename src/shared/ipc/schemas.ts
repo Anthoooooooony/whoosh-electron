@@ -8,7 +8,6 @@ import { z } from 'zod'
 // ───────────────────────────────────────────
 export const PlatformSchema = z.enum(['darwin', 'win32', 'linux'])
 export const HudStateSchema = z.enum(['recording', 'hover', 'processing', 'error'])
-export const SessionStateSchema = z.enum(['idle', 'recording', 'processing', 'error'])
 export const ErrorCodeSchema = z.enum([
   'NETWORK_ERROR',
   'PROVIDER_AUTH',
@@ -44,11 +43,6 @@ export const AudioStartSchema = z.object({
 // ───────────────────────────────────────────
 // session:*
 // ───────────────────────────────────────────
-export const SessionStateUpdateSchema = z.object({
-  state: SessionStateSchema,
-  durationMs: z.number().int().nonnegative().optional(),
-})
-
 export const SessionPartialSchema = z.object({
   text: z.string(),
 })
