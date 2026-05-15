@@ -9,12 +9,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
-import { triggerKeyLabel } from '@shared/trigger-key.js'
+import { triggerKeyLabel, type Platform } from '@shared/trigger-key.js'
+import { useAudioInputDevices } from '../_shared/use-audio-devices.js'
 
 initI18n()
-
-type Platform = 'darwin' | 'win32' | 'linux'
 
 interface OnboardingState {
   currentStep: 1 | 2 | 3 | 4
@@ -26,8 +26,8 @@ function App(): React.ReactElement {
 
   useEffect(() => {
     void (async () => {
-      const { step, platform } = await window.ipc.invoke('onboarding:get-step')
-      setState({ currentStep: step, platform: platform as Platform })
+      const { step, platform } = await window.ipc.invoke(Channels.ONBOARDING_GET_STEP)
+      setState({ currentStep: step, platform })
     })()
   }, [])
 
@@ -37,10 +37,10 @@ function App(): React.ReactElement {
 
   const completeStep = useCallback(
     async (step: 1 | 2 | 3 | 4) => {
-      const { nextStep } = await window.ipc.invoke('onboarding:complete-step', { step })
+      const { nextStep } = await window.ipc.invoke(Channels.ONBOARDING_COMPLETE_STEP, { step })
       if (nextStep === null) {
         // 全部完成
-        window.ipc.send('onboarding:done')
+        window.ipc.send(Channels.ONBOARDING_DONE)
       } else {
         goToStep(nextStep)
       }
@@ -125,9 +125,11 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
 
   useEffect(() => {
     void (async () => {
-      const { key } = await window.ipc.invoke('settings:get-apikey', { providerId: 'doubao' })
+      const { key } = await window.ipc.invoke(Channels.SETTINGS_GET_APIKEY, {
+        providerId: 'doubao',
+      })
       if (key) setApiKey(key)
-      const cfg = await window.ipc.invoke('settings:get')
+      const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
       const stored = (cfg.providers['doubao']?.['resourceId'] as string) ?? null
       if (stored) setResourceId(stored)
     })()
@@ -137,7 +139,7 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
     setTesting(true)
     setTestOk(null)
     try {
-      const res = await window.ipc.invoke('provider:test-connection', {
+      const res = await window.ipc.invoke(Channels.PROVIDER_TEST_CONNECTION, {
         providerId: 'doubao',
         credentials: { apiKey, resourceId },
       })
@@ -145,9 +147,9 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
       setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
       if (res.ok) {
         // 保存
-        await window.ipc.invoke('settings:set-apikey', { providerId: 'doubao', key: apiKey })
-        const cfg = await window.ipc.invoke('settings:get')
-        await window.ipc.invoke('settings:set', {
+        await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, { providerId: 'doubao', key: apiKey })
+        const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
+        await window.ipc.invoke(Channels.SETTINGS_SET, {
           providers: {
             ...cfg.providers,
             doubao: { ...(cfg.providers['doubao'] ?? {}), resourceId },
@@ -260,13 +262,13 @@ function Step2Microphone({
 
   useEffect(() => {
     void (async () => {
-      const { mic } = await window.ipc.invoke('permission:status')
+      const { mic } = await window.ipc.invoke(Channels.PERMISSION_STATUS)
       if (mic) setStatus('granted')
     })()
   }, [])
 
   const grant = useCallback(async () => {
-    const res = await window.ipc.invoke('permission:request-mic')
+    const res = await window.ipc.invoke(Channels.PERMISSION_REQUEST_MIC)
     setStatus(res.granted ? 'granted' : 'denied')
   }, [])
 
@@ -333,14 +335,14 @@ function Step3Accessibility({
 
   useEffect(() => {
     const tick = setInterval(async () => {
-      const res = await window.ipc.invoke('permission:status')
+      const res = await window.ipc.invoke(Channels.PERMISSION_STATUS)
       if (res.accessibility === true) setGranted(true)
     }, 1500)
     return () => clearInterval(tick)
   }, [])
 
   const openPrefs = useCallback(() => {
-    window.ipc.send('permission:open-system-prefs', { pane: 'accessibility' })
+    window.ipc.send(Channels.PERMISSION_OPEN_SYSTEM_PREFS, { pane: 'accessibility' })
   }, [])
 
   return (
@@ -405,41 +407,22 @@ function Step4Trial({
   onBack: () => void
 }): React.ReactElement {
   const [text, setText] = useState('')
-  const [devices, setDevices] = useState<{ deviceId: string; label: string }[]>([])
+  const { devices } = useAudioInputDevices()
   const [deviceId, setDeviceId] = useState<string>('')
 
   useEffect(() => {
     void (async () => {
-      const cfg = await window.ipc.invoke('settings:get')
+      const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
       setDeviceId(cfg?.audio?.inputDeviceId ?? '')
     })()
   }, [])
-
-  const refreshDevices = useCallback(async () => {
-    try {
-      const list = await navigator.mediaDevices.enumerateDevices()
-      const audioInputs = list
-        .filter((d) => d.kind === 'audioinput')
-        .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
-        .map((d) => ({ deviceId: d.deviceId, label: d.label || '未命名设备' }))
-      setDevices(audioInputs)
-    } catch (err) {
-      console.error('[onboarding] enumerateDevices failed', err)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refreshDevices()
-    navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
-    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
-  }, [refreshDevices])
 
   const onDeviceChange = useCallback(
     async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const id = e.target.value
       setDeviceId(id)
       const label = devices.find((d) => d.deviceId === id)?.label
-      await window.ipc.invoke('settings:set', {
+      await window.ipc.invoke(Channels.SETTINGS_SET, {
         audio: {
           inputDeviceId: id || null,
           ...(label ? { inputDeviceLabel: label } : {}),

@@ -20,6 +20,7 @@
 import { Menu, Tray, app, nativeImage, shell, systemPreferences } from 'electron'
 import { deflateSync } from 'node:zlib'
 import { getAppWindows } from './windows.js'
+import { openSystemPrefPane } from './system-prefs.js'
 
 let tray: Tray | null = null
 
@@ -127,25 +128,13 @@ export async function rebuildMenu(): Promise<void> {
     { type: 'separator' },
     {
       label: `麦克风权限：${mic ? '✓ 已授权' : '✗ 未授权'}`,
-      click: () => {
-        if (process.platform === 'darwin') {
-          void shell.openExternal(
-            'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
-          )
-        } else if (process.platform === 'win32') {
-          void shell.openExternal('ms-settings:privacy-microphone')
-        }
-      },
+      click: () => openSystemPrefPane('microphone'),
     },
   ]
   if (acc !== null) {
     items.push({
       label: `辅助功能权限：${acc ? '✓ 已授权' : '✗ 未授权'}`,
-      click: () => {
-        void shell.openExternal(
-          'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
-        )
-      },
+      click: () => openSystemPrefPane('accessibility'),
     })
   }
   if (state.updateInfo) {

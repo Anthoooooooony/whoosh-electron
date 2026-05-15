@@ -6,67 +6,36 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Channels } from '@shared/ipc/channels.js'
+import type { AppConfig } from '@shared/ipc/schemas.js'
 import { initI18n } from '@shared/i18n/index.js'
 import { triggerKeyLabel } from '@shared/trigger-key.js'
+import { useAudioInputDevices, type DeviceInfo } from '../_shared/use-audio-devices.js'
 
 initI18n()
 
 type SectionKey = 'setup' | 'provider' | 'behavior' | 'logs' | 'about'
 
-interface AppConfig {
-  audio: { inputDeviceId: string | null; inputDeviceLabel?: string }
-  providers: Record<string, Record<string, unknown>>
-  currentProviderId: 'doubao'
-  behavior: { showHudWhenRecording: boolean; openAtLogin: boolean }
-  logging: { verbose: boolean }
-  ui: { locale: 'zh-CN' | 'en' }
-  onboarding: { completedSteps: string[]; done: boolean }
-}
-
-interface DeviceInfo {
-  deviceId: string
-  label: string
-}
-
 function App(): React.ReactElement {
   const [section, setSection] = useState<SectionKey>('setup')
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [apiKey, setApiKeyState] = useState<string>('')
-  const [devices, setDevices] = useState<DeviceInfo[]>([])
+  const { devices, refresh: refreshDevices } = useAudioInputDevices()
 
   /* 初始拉配置 */
   useEffect(() => {
     void (async () => {
-      const cfg = (await window.ipc.invoke('settings:get')) as AppConfig
+      const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
       setConfig(cfg)
-      const { key } = await window.ipc.invoke('settings:get-apikey', { providerId: 'doubao' })
+      const { key } = await window.ipc.invoke(Channels.SETTINGS_GET_APIKEY, {
+        providerId: 'doubao',
+      })
       setApiKeyState(key ?? '')
     })()
   }, [])
 
-  /* 拉麦克风设备列表 */
-  const refreshDevices = useCallback(async () => {
-    try {
-      const list = await navigator.mediaDevices.enumerateDevices()
-      const audioInputs = list
-        .filter((d) => d.kind === 'audioinput')
-        // 排除浏览器自带的 default / communications 入口：我们已有「系统默认」一项
-        .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
-        .map((d) => ({ deviceId: d.deviceId, label: d.label || '未命名设备' }))
-      setDevices(audioInputs)
-    } catch (err) {
-      console.error('[settings] enumerateDevices failed', err)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refreshDevices()
-    navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
-    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
-  }, [refreshDevices])
-
   const updateConfig = useCallback(async (patch: Partial<AppConfig>) => {
-    const next = (await window.ipc.invoke('settings:set', patch)) as AppConfig
+    const next = await window.ipc.invoke(Channels.SETTINGS_SET, patch)
     setConfig(next)
   }, [])
 
@@ -167,7 +136,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
   } | null>(null)
 
   const saveApiKey = useCallback(async () => {
-    await window.ipc.invoke('settings:set-apikey', { providerId: 'doubao', key: apiKey })
+    await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, { providerId: 'doubao', key: apiKey })
     await updateConfig({
       providers: {
         ...config.providers,
@@ -180,7 +149,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await window.ipc.invoke('provider:test-connection', {
+      const res = await window.ipc.invoke(Channels.PROVIDER_TEST_CONNECTION, {
         providerId: 'doubao',
         credentials: { apiKey, resourceId },
       })
@@ -473,7 +442,7 @@ function BehaviorPane({ config, updateConfig }: BehaviorPaneProps): React.ReactE
             <div className="row-control">
               <span className="kbd">{window.platform === 'darwin' ? '⌥' : 'Ctrl'}</span>
               <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                右 Option（macOS）/ 右 Ctrl（Windows）
+                {triggerKeyLabel(window.platform)}
               </span>
             </div>
           </div>
@@ -617,7 +586,7 @@ function AboutPane(): React.ReactElement {
   const checkUpdate = useCallback(async () => {
     setChecking(true)
     try {
-      const res = await window.ipc.invoke('updater:check')
+      const res = await window.ipc.invoke(Channels.UPDATER_CHECK)
       const info: { hasUpdate: boolean; version?: string; url?: string } = {
         hasUpdate: res.hasUpdate,
       }
@@ -647,9 +616,8 @@ function AboutPane(): React.ReactElement {
               <a
                 href="https://github.com/Anthoooooooony/whoosh-electron"
                 onClick={(e) => {
+                  // M15 接 shell.openExternal 后再真正跳浏览器；在此之前先拦掉，避免导航走 settings 窗口
                   e.preventDefault()
-                  void window.ipc.send('permission:open-system-prefs', { pane: 'accessibility' })
-                  // 实际跳浏览器在 M15 用 shell.openExternal；此处占位
                 }}
               >
                 github.com/Anthoooooooony/whoosh-electron

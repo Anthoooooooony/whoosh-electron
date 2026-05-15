@@ -16,6 +16,7 @@
 // Vite 的 worker 管线会转译 + 打包 processor.ts 成独立 chunk，?worker&url 拿到它的 URL。
 // 用 ?url 会把 .ts 当静态资源不转译，打包后 addModule 拿到原始 TS 直接 SyntaxError（见 #41）。
 import workletUrl from './worklet/processor.ts?worker&url'
+import { Channels } from '@shared/ipc/channels.js'
 
 interface CaptureSession {
   stop(): Promise<void>
@@ -47,7 +48,7 @@ async function openCaptureSession(deviceId: string | null): Promise<CaptureSessi
   let chunkCount = 0
   node.port.onmessage = (event: MessageEvent<ArrayBuffer>): void => {
     const u8 = new Uint8Array(event.data)
-    window.ipc.send('audio:chunk', { chunk: u8, timestamp: Date.now() })
+    window.ipc.send(Channels.AUDIO_CHUNK, { chunk: u8, timestamp: Date.now() })
     chunkCount++
   }
 

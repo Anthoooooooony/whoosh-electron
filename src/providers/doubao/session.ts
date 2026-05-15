@@ -474,10 +474,7 @@ export class DoubaoSession extends EventEmitter {
     // 55000031 服务过载
     // 详见文档「错误码」节
     if (serverCode === 55000031) return 'QUOTA'
-    if (serverCode >= 45000000 && serverCode < 46000000) {
-      if (serverCode === 45000001) return 'PROTOCOL'
-      return 'PROTOCOL'
-    }
+    if (serverCode >= 45000000 && serverCode < 46000000) return 'PROTOCOL'
     return 'UNKNOWN'
   }
 }

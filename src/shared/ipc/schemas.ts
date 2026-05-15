@@ -88,6 +88,8 @@ export const AppConfigSchema = z.object({
   }),
 })
 
+export type AppConfig = z.infer<typeof AppConfigSchema>
+
 export const SettingsSetSchema = AppConfigSchema.partial()
 
 export const SettingsGetApikeySchema = z.object({

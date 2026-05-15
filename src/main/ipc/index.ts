@@ -5,8 +5,9 @@
 //   - audio:chunk 由 SessionOrchestrator 通过 onAudioChunk 回调消费
 //   - 注册函数 idempotent（重复调用 throw），由 main/index.ts 在 app.whenReady 之后调用一次
 
-import { app, ipcMain, shell, systemPreferences } from 'electron'
+import { app, ipcMain, systemPreferences } from 'electron'
 import { checkOnce as updaterCheckOnce } from '../updater/index.js'
+import { openSystemPrefPane } from '../system-prefs.js'
 import { z } from 'zod'
 import { Channels } from '@shared/ipc/channels.js'
 import type { InvokeContract, SendContract } from '@shared/ipc/types.js'
@@ -208,17 +209,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleSend(Channels.PERMISSION_OPEN_SYSTEM_PREFS, PermissionOpenSystemPrefsSchema, (payload) => {
-    if (process.platform === 'darwin') {
-      const url =
-        payload.pane === 'accessibility'
-          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
-          : 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
-      void shell.openExternal(url)
-    } else if (process.platform === 'win32') {
-      void shell.openExternal(
-        payload.pane === 'microphone' ? 'ms-settings:privacy-microphone' : 'ms-settings:privacy',
-      )
-    }
+    openSystemPrefPane(payload.pane)
   })
 
   handleSend(Channels.APP_RELAUNCH, null, () => {
