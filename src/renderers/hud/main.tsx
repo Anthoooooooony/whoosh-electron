@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
 
 initI18n()
@@ -32,7 +33,7 @@ function App(): React.ReactElement | null {
 
   /* IPC subscription */
   useEffect(() => {
-    const offShow = window.ipc.on('hud:show', (payload) => {
+    const offShow = window.ipc.on(Channels.HUD_SHOW, (payload) => {
       const next: ServerState = (payload?.state as ServerState | undefined) ?? 'recording'
       // 'hover' 不会从 main 主动发，但 schema 允许；映射到 recording
       const normalized: ServerState = next === 'hidden' ? 'hidden' : (next as ServerState)
@@ -44,19 +45,19 @@ function App(): React.ReactElement | null {
         recordStartRef.current = Date.now()
       }
     })
-    const offHide = window.ipc.on('hud:hide', () => {
+    const offHide = window.ipc.on(Channels.HUD_HIDE, () => {
       setState('hidden')
       setPartial('')
       setErrorMsg('')
       setHover(false)
     })
-    const offPartial = window.ipc.on('session:partial', (payload) => {
+    const offPartial = window.ipc.on(Channels.SESSION_PARTIAL, (payload) => {
       if (payload?.text) setPartial(payload.text)
     })
-    const offFinal = window.ipc.on('session:final', (payload) => {
+    const offFinal = window.ipc.on(Channels.SESSION_FINAL, (payload) => {
       if (payload?.text) setPartial(payload.text)
     })
-    const offError = window.ipc.on('session:error', (payload) => {
+    const offError = window.ipc.on(Channels.SESSION_ERROR, (payload) => {
       setErrorMsg(payload?.message ?? '未知错误')
     })
 
@@ -69,10 +70,10 @@ function App(): React.ReactElement | null {
     }
   }, [])
 
-  /* recording 期间每秒刷新计时器 */
+  /* recording 期间每秒刷新计时器 —— formatTimer 只到秒级，1s 间隔即可 */
   useEffect(() => {
     if (state !== 'recording') return
-    const tick = setInterval(() => forceRerender((n) => n + 1), 250)
+    const tick = setInterval(() => forceRerender((n) => n + 1), 1000)
     return () => clearInterval(tick)
   }, [state])
 
@@ -84,7 +85,7 @@ function App(): React.ReactElement | null {
     setHover(false)
   }, [])
   const onCancelClick = useCallback(() => {
-    window.ipc.send('hud:cancel')
+    window.ipc.send(Channels.HUD_CANCEL)
     setHover(false)
   }, [])
 

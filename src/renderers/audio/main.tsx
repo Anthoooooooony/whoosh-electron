@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Channels } from '@shared/ipc/channels.js'
 import { startCapture, stopCapture } from './bridge.js'
 
 type Status = 'idle' | 'capturing' | 'error'
@@ -15,7 +16,7 @@ function App(): React.ReactElement {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    const offStart = window.ipc.on('audio:start', (payload) => {
+    const offStart = window.ipc.on(Channels.AUDIO_START, (payload) => {
       void (async (): Promise<void> => {
         try {
           await startCapture(payload.deviceId)
@@ -29,7 +30,7 @@ function App(): React.ReactElement {
       })()
     })
 
-    const offStop = window.ipc.on('audio:stop', () => {
+    const offStop = window.ipc.on(Channels.AUDIO_STOP, () => {
       void (async (): Promise<void> => {
         try {
           await stopCapture()
@@ -39,7 +40,7 @@ function App(): React.ReactElement {
       })()
     })
 
-    const offAbort = window.ipc.on('audio:abort', () => {
+    const offAbort = window.ipc.on(Channels.AUDIO_ABORT, () => {
       void (async (): Promise<void> => {
         try {
           await stopCapture()

@@ -7,10 +7,9 @@
 
 import { safeStorage } from 'electron'
 import ElectronStore from 'electron-store'
-import { z } from 'zod'
-import { AppConfigSchema } from '@shared/ipc/schemas.js'
+import { AppConfigSchema, type AppConfig } from '@shared/ipc/schemas.js'
 
-export type AppConfig = z.infer<typeof AppConfigSchema>
+export type { AppConfig }
 
 /**
  * AppConfigPatch —— 部分更新；exactOptionalPropertyTypes 下需要显式允许 undefined，
