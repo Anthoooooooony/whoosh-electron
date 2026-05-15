@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.8](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.7...v0.2.8) (2026-05-15)
+
+
+### Bug Fixes
+
+* extract shared helpers and use Channels constants in renderers ([50774ab](https://github.com/Anthoooooooony/whoosh-electron/commit/50774ab4cf3844114f6819c963091a9dc7442240))
+* extract shared helpers and use Channels constants in renderers ([e99c9a9](https://github.com/Anthoooooooony/whoosh-electron/commit/e99c9a9dcbf27cf1950c791ffaa0362b601ca07b))
+
 ## [0.2.7](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.6...v0.2.7) (2026-05-14)
 
 
