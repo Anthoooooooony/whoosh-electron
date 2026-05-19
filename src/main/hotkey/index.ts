@@ -24,12 +24,19 @@ let actionListener: ((action: HotkeyAction) => void) | null = null
  * 启动全局键盘监听。Accessibility 未授权时打 warn 但不 throw，
  * 让 app 主体能继续 boot；上层可在权限授予后重试 start()。
  *
+ * 注意：uIOhook 的 native listener 仅支持「整进程一次性注册」语义 ——
+ * 一旦 uIOhook.start() 成功，本模块的 `started` flag 就锁死，后续 start()
+ * 调用是幂等 no-op（仅换 actionListener 闭包）。要换 targetKeycode 或
+ * 重建 listener 链必须整进程重启 app，没有单独 re-register 的路径。
+ * 改触发键、改 FSM 输入都需要在 app 启动前确定好。
+ *
  * @param onAction 每当 FSM 派发非 null 的 action 时调用一次（START_RECORDING /
  *                 COMMIT_RECORDING / ABORT_SHORT / ABORT_CANCEL / DONE）
  * @returns ok=false 表示 uIOhook.start() 抛异常（多半是 Accessibility 未授权）
  */
 export function startHotkeyListener(onAction: (action: HotkeyAction) => void): { ok: boolean } {
   actionListener = onAction
+  // 已经起来过：保留原 listener 与 keycode，仅换 actionListener 闭包（见上面 doc）。
   if (started && listener) return { ok: true }
 
   listener = createHotkeyListener({
