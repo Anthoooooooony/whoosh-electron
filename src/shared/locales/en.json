@@ -83,6 +83,7 @@
       "diagnostics": "Diagnostics",
       "verbose": "Verbose logging",
       "verboseWarn": "⚠ Includes transcribed text for debugging — keep off unless reproducing an issue.",
+      "verboseHint": "When on, transcripts are written to local logs only — never uploaded.",
       "privacy": "Privacy",
       "telemetry": "Telemetry",
       "telemetryHint": "No usage data collected.",
