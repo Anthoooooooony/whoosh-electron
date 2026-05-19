@@ -143,11 +143,20 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
         providerId: 'doubao',
         credentials: { apiKey, resourceId },
       })
-      setTestOk(res.ok)
-      setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
       if (res.ok) {
-        // 保存
-        await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, { providerId: 'doubao', key: apiKey })
+        // 保存 —— safeStorage 不可用时 main 端拒绝写入，需把失败反映到 UI 上，
+        // 否则用户点了"已连接"但密钥根本没落盘，下一次启动直接进不了 ASR。
+        const saveRes = await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, {
+          providerId: 'doubao',
+          key: apiKey,
+        })
+        if (!saveRes.ok) {
+          setTestOk(false)
+          setTestMsg(
+            '系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）',
+          )
+          return
+        }
         const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
         await window.ipc.invoke(Channels.SETTINGS_SET, {
           providers: {
@@ -156,6 +165,8 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
           },
         })
       }
+      setTestOk(res.ok)
+      setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
     } catch (err) {
       setTestOk(false)
       setTestMsg(err instanceof Error ? err.message : String(err))

@@ -135,14 +135,23 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
     latency?: number
   } | null>(null)
 
-  const saveApiKey = useCallback(async () => {
-    await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, { providerId: 'doubao', key: apiKey })
+  // 失败时把 reason 返回给调用方，让 testConnection 把测试结果覆盖成保存失败提示。
+  // 不在这里 setTestResult —— 调用方还要根据成功 / 失败决定后续 resourceId 同步。
+  const saveApiKey = useCallback(async (): Promise<
+    { ok: true } | { ok: false; reason: 'encryption-unavailable' }
+  > => {
+    const res = await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, {
+      providerId: 'doubao',
+      key: apiKey,
+    })
+    if (!res.ok) return res
     await updateConfig({
       providers: {
         ...config.providers,
         doubao: { ...(config.providers['doubao'] ?? {}), resourceId },
       },
     })
+    return { ok: true }
   }, [apiKey, resourceId, config, updateConfig])
 
   const testConnection = useCallback(async () => {
@@ -158,8 +167,18 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
         msg: res.ok ? '连接成功' : (res.error ?? 'unknown error'),
       } as { ok: boolean; msg: string; latency?: number }
       if (res.latencyMs !== undefined) result.latency = res.latencyMs
+      if (res.ok) {
+        const saved = await saveApiKey()
+        if (!saved.ok) {
+          // 连接成功但本地没法安全保存 —— 用户看到的就是失败结果，不展示"已连接"假象。
+          setTestResult({
+            ok: false,
+            msg: '系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）',
+          })
+          return
+        }
+      }
       setTestResult(result)
-      if (res.ok) await saveApiKey()
     } catch (err) {
       setTestResult({ ok: false, msg: err instanceof Error ? err.message : String(err) })
     } finally {
