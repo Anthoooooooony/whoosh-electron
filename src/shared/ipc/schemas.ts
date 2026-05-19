@@ -6,7 +6,8 @@ import { z } from 'zod'
 // ───────────────────────────────────────────
 // 基础类型
 // ───────────────────────────────────────────
-export const PlatformSchema = z.enum(['darwin', 'win32', 'linux'])
+// 仅 macOS + Windows；详见 src/shared/trigger-key.ts 的注释。
+export const PlatformSchema = z.enum(['darwin', 'win32'])
 export const HudStateSchema = z.enum(['recording', 'hover', 'processing', 'error'])
 export const ErrorCodeSchema = z.enum([
   'NETWORK_ERROR',

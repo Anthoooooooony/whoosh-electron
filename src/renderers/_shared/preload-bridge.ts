@@ -46,6 +46,8 @@ function createIpcApi(): IpcApi {
 
 export function exposeIpcBridge(): void {
   contextBridge.exposeInMainWorld('ipc', createIpcApi())
-  // 静态环境信息：renderer 据此分叉平台相关 UI（如触发键文案）
-  contextBridge.exposeInMainWorld('platform', process.platform)
+  // 静态环境信息：renderer 据此分叉平台相关 UI（如触发键文案）。
+  // 收窄成 'darwin' | 'win32'：本仓只支持这两平台，运行期不在两者之内时仍按 win32 走 —— 不影响生产分发。
+  const platform: 'darwin' | 'win32' = process.platform === 'darwin' ? 'darwin' : 'win32'
+  contextBridge.exposeInMainWorld('platform', platform)
 }
