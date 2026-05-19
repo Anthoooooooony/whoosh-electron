@@ -17,6 +17,9 @@ const sharedAlias = {
 //   - dom：renderer 的 `.test.tsx` —— RTL + happy-dom，附带 mock window.ipc / i18n
 //
 // include 用扩展名严格分流（node 只匹配 .ts，dom 只匹配 .tsx），避免一个文件被两组都跑。
+//
+// coverage 在 root 级（projects 自动继承）—— baseline 阶段不设 thresholds，
+// 只跑 `pnpm test:coverage` 时按需收集。
 export default defineConfig({
   resolve: { alias: sharedAlias },
   test: {
@@ -40,5 +43,19 @@ export default defineConfig({
         },
       },
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.d.ts',
+        'src/native/**',
+        'src/renderers/**/main.tsx',
+        'src/renderers/**/preload.ts',
+        'src/main/index.ts',
+      ],
+      // baseline 阶段：不设 thresholds，先收集数据
+    },
   },
 })
