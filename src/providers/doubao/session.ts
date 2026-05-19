@@ -87,9 +87,11 @@ export interface DoubaoSessionConfig {
 type State = 'idle' | 'connecting' | 'ready' | 'streaming' | 'finishing' | 'closed' | 'error'
 
 // 背压阈值 —— 弱网下 ws.send 会把未发出的帧堆进 socket buffer，几十秒就能涨到 MB 级。
-// 256KB ≈ 200 帧 16kHz mono s16le PCM ≈ 8s 音频缓冲量，超过即认为「上行已经撑不住」：
-// 此时丢新帧让 buffer 自然回落，比让旧帧积压更接近实时；ASR 的 partial 会在拥塞窗口
-// 内出现识别空洞，是有意的 graceful degradation。
+// 256KB 是「wire 字节」量（ws.bufferedAmount 算的是 gzip / 帧头 / 控制帧打包后的字节），
+// 不是 raw PCM；对应到上行音频大约是 250-300 个 gzip 压缩音频帧 / 约 10-12s 上行缓冲量
+// （seed-codec 给音频帧默认压缩，单帧 raw 1280B 压完通常 800-1000B）。
+// 超过即认为「上行已经撑不住」：此时丢新帧让 buffer 自然回落，比让旧帧积压更接近实时；
+// ASR 的 partial 会在拥塞窗口内出现识别空洞，是有意的 graceful degradation。
 const WS_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024
 
 export interface DoubaoSessionMetrics {
@@ -121,8 +123,8 @@ export class DoubaoSession extends EventEmitter {
   private firstResponseReject: ((err: Error) => void) | null = null
   private retried = false
   // 仅 session 内部观察用；绝不在 info 级日志输出（避免间接泄漏识别活动节奏）。
-  // cleanup 时若有非零信号一次性 emit 到 debug 日志（与 #62 verbose toggle 协同，
-  // 当前 console.debug 占位，等 logging.verbose 落地后改走 logger）。
+  // cleanup 时若有非零信号一次性 emit 到 debug 日志 —— 详见 emitMetricsOnClose 注释，
+  // 该 debug 通道与 #62 verbose toggle 是独立维度（metrics 非隐私文本）。
   private readonly metrics: DoubaoSessionMetrics = {
     dropCount: 0,
     maxBufferedAmount: 0,
@@ -183,11 +185,17 @@ export class DoubaoSession extends EventEmitter {
     // finish() 仅在 ready / streaming 态合法。其它态显式抛错让上层 catch 兜底，
     // 而非 silent return —— 后者会让 orchestrator 误以为会话正常结束、永等不来的
     // final 事件，HUD 永久卡 processing（#50）。
+    //
+    // 拆成两条不同的 error message：
+    //   - 'session-not-streaming'：state 不在 ready/streaming（FSM 层错）
+    //   - 'session-ws-closed'：state 合法但底层 ws 已断（IO 层错）
+    // 上层 orchestrator 可根据 message 做不同 fallback：前者是 bug（不该调 finish），
+    // 后者是网络情况（值得 retry 或提示用户）。
     if (this.state !== 'ready' && this.state !== 'streaming') {
       throw new Error(`session-not-streaming: cannot finish in state '${this.state}'`)
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('session-not-streaming: ws not open')
+      throw new Error('session-ws-closed: ws not open during finish')
     }
     this.state = 'finishing'
     this.sequence += 1
@@ -210,6 +218,11 @@ export class DoubaoSession extends EventEmitter {
           this.cleanup()
         }
       }, 5000)
+      // wrappedResolve 在 timeout 注册之后才赋给 this.finishResolve；中间窗口里
+      // resolve / reject 都未触发，Promise 还没 settle，所以「先 plain resolve、
+      // 后又被 timeout 路径抢到」的竞争是不可能的。即便 wrap 完成之后服务端 final
+      // 帧与 setTimeout 几乎同时到达，Promise 只接受第一次 settle —— 后 settle 的
+      // 调用 silent no-op，clearTimeout 也是幂等的。零行为风险。
       const wrappedResolve = (): void => {
         clearTimeout(timeout)
         resolve()
@@ -497,8 +510,11 @@ export class DoubaoSession extends EventEmitter {
   }
 
   // 会话收尾时把背压观察值落到 debug 日志，方便事后判断阈值是否合理。
-  // 仅 dropCount > 0 或 maxBufferedAmount 显著（>1 帧 ~3.2KB）才输出，避免噪音；
-  // 用 console.debug 占位，#62 落地 logger.verbose 后改走它。
+  // 仅 dropCount > 0 或 maxBufferedAmount 显著（>1 帧 ~3.2KB）才输出，避免噪音。
+  //
+  // 不接 #62 的 verbose toggle —— 该 toggle 的语义是「把识别文本（隐私敏感）写日志」，
+  // 而 metrics 是结构化数值，没有隐私问题，留在 console.debug 即可：用户主动开 devtools
+  // 才会看到，与 info 级别隔离。要单独切关 metrics 输出可以未来加 logging.metrics flag。
   private emitMetricsOnClose(): void {
     const { dropCount, maxBufferedAmount } = this.metrics
     if (dropCount === 0 && maxBufferedAmount < 4 * 1024) return
