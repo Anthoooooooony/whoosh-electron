@@ -14,9 +14,12 @@
 // AudioWorkletGlobalScope 提供 globalThis.sampleRate（输入采样率）、
 // globalThis.AudioWorkletProcessor 和 globalThis.registerProcessor。
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// AudioWorkletProcessor 子类约束：构造期不带参，process(...) 返回 boolean。
+// 这里用最小约束的 constructor 类型，避免 any 也不强行重建整套 Web Audio API 类型。
+type AudioWorkletProcessorCtor = new () => { readonly port: MessagePort }
+
 declare const sampleRate: number
-declare function registerProcessor(name: string, processor: any): void
+declare function registerProcessor(name: string, processor: AudioWorkletProcessorCtor): void
 
 const OUTPUT_SAMPLE_RATE = 16000
 const CHUNK_MS = 40
@@ -77,8 +80,11 @@ export function createResampler(inputSampleRate: number): Resampler {
 // ↓ 仅在 AudioWorkletGlobalScope 有意义。vitest 直接 import 本文件取 createResampler 时，
 //   globalThis.AudioWorkletProcessor / registerProcessor 不存在 —— 用空基类兜底、跳过注册，
 //   使 class 定义不抛、import 不触发 worklet 注册。
-const WorkletProcessorBase: { new (): { readonly port: MessagePort } } =
-  (globalThis as any).AudioWorkletProcessor ?? class {}
+// 空基类的 port 字段在 vitest 路径下永远不会被访问（只有 createResampler 被 import），
+// 故塑形成 ctor 即可，无需真实 MessagePort 占位。
+const WorkletProcessorBase: AudioWorkletProcessorCtor =
+  (globalThis as { AudioWorkletProcessor?: AudioWorkletProcessorCtor }).AudioWorkletProcessor ??
+  (class {} as unknown as AudioWorkletProcessorCtor)
 
 class DownsampleProcessor extends WorkletProcessorBase {
   private readonly resampler = createResampler(sampleRate)
