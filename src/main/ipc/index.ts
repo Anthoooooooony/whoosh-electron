@@ -22,7 +22,7 @@ import {
   SettingsSetSchema,
 } from '@shared/ipc/schemas.js'
 
-import type { AppConfig, AppConfigPatch } from '../store/index.js'
+import type { AppConfig, AppConfigPatch, SetApiKeyResult } from '../store/index.js'
 
 export interface IpcHandlerDeps {
   /** orchestrator 消费 audio renderer 推上来的每一帧 PCM */
@@ -35,8 +35,8 @@ export interface IpcHandlerDeps {
   setConfig(patch: AppConfigPatch): AppConfig
   /** 读取某 provider 的 API key（safeStorage 解密后） */
   getApiKey(providerId: string): string | null
-  /** 写入某 provider 的 API key */
-  setApiKey(providerId: string, key: string): void
+  /** 写入某 provider 的 API key；safeStorage 不可用时返回失败由 UI 处理 */
+  setApiKey(providerId: string, key: string): SetApiKeyResult
   /** 用候选凭据真实连接一次 ASR provider 做握手，验证可用 */
   testProviderConnection(
     req: z.infer<typeof ProviderTestConnectionRequestSchema>,
@@ -118,8 +118,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   })
 
   handleInvoke(Channels.SETTINGS_SET_APIKEY, SettingsSetApikeySchema, (req) => {
-    deps.setApiKey(req.providerId, req.key)
-    return { ok: true as const }
+    return deps.setApiKey(req.providerId, req.key)
   })
 
   handleInvoke(

@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { useTranslation } from 'react-i18next'
 import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
 import { triggerKeyLabel, type Platform } from '@shared/trigger-key.js'
@@ -117,6 +118,7 @@ function Footer({
    Step 1: Credentials
    ─────────────────────────────────────────────────────────── */
 function Step1Credentials({ onComplete }: { onComplete: () => void }): React.ReactElement {
+  const { t } = useTranslation()
   const [apiKey, setApiKey] = useState('')
   const [resourceId, setResourceId] = useState('volc.seedasr.sauc.duration')
   const [testing, setTesting] = useState(false)
@@ -143,11 +145,18 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
         providerId: 'doubao',
         credentials: { apiKey, resourceId },
       })
-      setTestOk(res.ok)
-      setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
       if (res.ok) {
-        // 保存
-        await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, { providerId: 'doubao', key: apiKey })
+        // 保存 —— safeStorage 不可用时 main 端拒绝写入，需把失败反映到 UI 上，
+        // 否则用户点了"已连接"但密钥根本没落盘，下一次启动直接进不了 ASR。
+        const saveRes = await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, {
+          providerId: 'doubao',
+          key: apiKey,
+        })
+        if (!saveRes.ok) {
+          setTestOk(false)
+          setTestMsg(t('errors.safeStorageUnavailable'))
+          return
+        }
         const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
         await window.ipc.invoke(Channels.SETTINGS_SET, {
           providers: {
@@ -156,13 +165,15 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
           },
         })
       }
+      setTestOk(res.ok)
+      setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
     } catch (err) {
       setTestOk(false)
       setTestMsg(err instanceof Error ? err.message : String(err))
     } finally {
       setTesting(false)
     }
-  }, [apiKey, resourceId])
+  }, [apiKey, resourceId, t])
 
   return (
     <>

@@ -52,8 +52,18 @@ const DEFAULT_CONFIG: AppConfig = {
 
 interface StoreSchema {
   config: AppConfig
-  apiKeys: Record<string, string> // ciphertext base64; safeStorage 加密
+  apiKeys: Record<string, string> // 加密值带 ENCRYPTED_PREFIX；无前缀视为遗留明文
 }
+
+// 持久化的密文都带版本化前缀；读路径据此区分明文遗留条目 vs 加密条目，
+// 避免根据长度 / base64 形态做脆弱启发式判断。
+const ENCRYPTED_PREFIX = 'enc:v1:'
+
+function isEncryptedEntry(value: string): boolean {
+  return value.startsWith(ENCRYPTED_PREFIX)
+}
+
+export type SetApiKeyResult = { ok: true } | { ok: false; reason: 'encryption-unavailable' }
 
 let storeInstance: ElectronStore<StoreSchema> | null = null
 
@@ -97,31 +107,50 @@ export function setConfig(patch: AppConfigPatch): AppConfig {
 /* ───── api keys (encrypted with safeStorage) ───── */
 
 export function getApiKey(providerId: string): string | null {
-  if (!safeStorage.isEncryptionAvailable()) {
-    // OS 不支持加密时 fallback 到明文（开发环境 Linux 等场景）
-    const plain = store().get('apiKeys')?.[providerId]
-    return plain ?? null
+  const entry = store().get('apiKeys')?.[providerId]
+  if (!entry) return null
+
+  if (isEncryptedEntry(entry)) {
+    const b64 = entry.slice(ENCRYPTED_PREFIX.length)
+    try {
+      return safeStorage.decryptString(Buffer.from(b64, 'base64'))
+    } catch (err) {
+      console.error('[store] failed to decrypt api key', err)
+      return null
+    }
   }
-  const buf = store().get('apiKeys')?.[providerId]
-  if (!buf) return null
-  try {
-    return safeStorage.decryptString(Buffer.from(buf, 'base64'))
-  } catch (err) {
-    console.error('[store] failed to decrypt api key', err)
-    return null
+
+  // 遗留明文条目：safeStorage 已就绪则原地迁移到密文并落盘；否则只读取不写。
+  // 迁移路径是幂等的：迁移完成后下一次 get 命中加密分支。
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      const cipher = ENCRYPTED_PREFIX + safeStorage.encryptString(entry).toString('base64')
+      const apiKeys = { ...(store().get('apiKeys') ?? {}) }
+      apiKeys[providerId] = cipher
+      store().set('apiKeys', apiKeys)
+    } catch (err) {
+      console.error('[store] failed to migrate plaintext api key', err)
+    }
   }
+  return entry
 }
 
-export function setApiKey(providerId: string, key: string): void {
+export function setApiKey(providerId: string, key: string): SetApiKeyResult {
   const apiKeys = { ...(store().get('apiKeys') ?? {}) }
   if (key === '') {
+    // 删除操作不依赖 safeStorage 可用，永远允许。
     delete apiKeys[providerId]
-  } else if (safeStorage.isEncryptionAvailable()) {
-    apiKeys[providerId] = safeStorage.encryptString(key).toString('base64')
-  } else {
-    apiKeys[providerId] = key
+    store().set('apiKeys', apiKeys)
+    return { ok: true }
   }
+  if (!safeStorage.isEncryptionAvailable()) {
+    // 拒绝明文落盘 —— 同用户进程可直接读 electron-store JSON。
+    // 调用方负责把 reason 透给 UI 让用户处理（如装好 keyring 后重试）。
+    return { ok: false, reason: 'encryption-unavailable' }
+  }
+  apiKeys[providerId] = ENCRYPTED_PREFIX + safeStorage.encryptString(key).toString('base64')
   store().set('apiKeys', apiKeys)
+  return { ok: true }
 }
 
 /* ───── helpers ───── */

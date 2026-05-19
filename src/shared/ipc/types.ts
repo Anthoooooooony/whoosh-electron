@@ -26,6 +26,7 @@ import {
   SetDeviceSchema,
   SettingsGetApikeyResultSchema,
   SettingsGetApikeySchema,
+  SettingsSetApikeyResultSchema,
   SettingsSetApikeySchema,
   SettingsSetSchema,
   UpdaterCheckResponseSchema,
@@ -55,7 +56,7 @@ export interface InvokeContract {
   }
   [Channels.SETTINGS_SET_APIKEY]: {
     req: z.infer<typeof SettingsSetApikeySchema>
-    res: { ok: true }
+    res: z.infer<typeof SettingsSetApikeyResultSchema>
   }
 
   [Channels.PROVIDER_TEST_CONNECTION]: {

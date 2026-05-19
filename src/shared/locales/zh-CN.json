@@ -150,6 +150,7 @@
     "NETWORK_ERROR": "网络中断",
     "MIC_PERMISSION": "麦克风权限被拒",
     "DURATION_TOO_SHORT": "录音太短",
-    "UNKNOWN": "未知错误"
+    "UNKNOWN": "未知错误",
+    "safeStorageUnavailable": "系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）"
   }
 }

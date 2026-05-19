@@ -102,6 +102,11 @@ export const SettingsSetApikeySchema = z.object({
   providerId: ProviderIdSchema,
   key: z.string(),
 })
+// safeStorage 不可用时 main 端拒绝写入，renderer 据此弹错并保留输入内容。
+export const SettingsSetApikeyResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), reason: z.enum(['encryption-unavailable']) }),
+])
 
 // ───────────────────────────────────────────
 // provider:*
