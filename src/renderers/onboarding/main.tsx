@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { useTranslation } from 'react-i18next'
 import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
 import { triggerKeyLabel, type Platform } from '@shared/trigger-key.js'
@@ -117,6 +118,7 @@ function Footer({
    Step 1: Credentials
    ─────────────────────────────────────────────────────────── */
 function Step1Credentials({ onComplete }: { onComplete: () => void }): React.ReactElement {
+  const { t } = useTranslation()
   const [apiKey, setApiKey] = useState('')
   const [resourceId, setResourceId] = useState('volc.seedasr.sauc.duration')
   const [testing, setTesting] = useState(false)
@@ -152,9 +154,7 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
         })
         if (!saveRes.ok) {
           setTestOk(false)
-          setTestMsg(
-            '系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）',
-          )
+          setTestMsg(t('errors.safeStorageUnavailable'))
           return
         }
         const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
@@ -173,7 +173,7 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
     } finally {
       setTesting(false)
     }
-  }, [apiKey, resourceId])
+  }, [apiKey, resourceId, t])
 
   return (
     <>

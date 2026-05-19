@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { useTranslation } from 'react-i18next'
 import { Channels } from '@shared/ipc/channels.js'
 import type { AppConfig } from '@shared/ipc/schemas.js'
 import { initI18n } from '@shared/i18n/index.js'
@@ -125,6 +126,7 @@ interface SetupPaneProps {
 
 function SetupPane(props: SetupPaneProps): React.ReactElement {
   const { config, devices, apiKey, onApiKeyChange, updateConfig, refreshDevices } = props
+  const { t } = useTranslation()
   const [resourceId, setResourceId] = useState<string>(
     (config.providers['doubao']?.['resourceId'] as string) ?? 'volc.seedasr.sauc.duration',
   )
@@ -173,7 +175,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
           // 连接成功但本地没法安全保存 —— 用户看到的就是失败结果，不展示"已连接"假象。
           setTestResult({
             ok: false,
-            msg: '系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）',
+            msg: t('errors.safeStorageUnavailable'),
           })
           return
         }
@@ -184,7 +186,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
     } finally {
       setTesting(false)
     }
-  }, [apiKey, resourceId, saveApiKey])
+  }, [apiKey, resourceId, saveApiKey, t])
 
   return (
     <>
