@@ -6,7 +6,9 @@
 //   3. 可选注册并写入 ExcludeClipboardContentFromMonitorProcessing(DWORD=0)
 //      + CanIncludeInClipboardHistory(DWORD=0) 让 Win10+ Clipboard History 跳过
 //   4. SendInput 模拟 Ctrl+V
-//   5. detach std::thread Sleep(400) 后恢复原文本（避免阻塞调用线程）
+//   5. detach std::thread Sleep(100) 后恢复原文本（避免阻塞调用线程）
+//      —— 与 macOS 端 100ms 对齐；原本 400ms 期间若进程退出，detach 的 lambda
+//      会触摸已析构的全局态（ABI 风险），缩短窗口降低暴露面。
 //
 // 注：M4 阶段在 macOS 本地无法运行测试，仅保证 Windows CI 编译通过。
 
@@ -138,7 +140,7 @@ static Napi::Value PasteText(const Napi::CallbackInfo& info) {
     if (preserveClipboard && hasOriginal) {
         std::wstring toRestore = original;
         std::thread([toRestore]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(400));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             WriteClipboardText(toRestore, /*markTransient*/ false);
         }).detach();
     }
