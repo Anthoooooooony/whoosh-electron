@@ -8,6 +8,7 @@ import type { z } from 'zod'
 import { Channels } from './channels.js'
 import {
   AppConfigSchema,
+  AudioCaptureEndedSchema,
   AudioChunkSchema,
   AudioStartSchema,
   DeviceListSchema,
@@ -94,6 +95,7 @@ export interface InvokeContract {
 export interface SendContract {
   [Channels.AUDIO_CHUNK]: z.infer<typeof AudioChunkSchema>
   [Channels.AUDIO_SET_DEVICE]: z.infer<typeof SetDeviceSchema>
+  [Channels.AUDIO_CAPTURE_ENDED]: z.infer<typeof AudioCaptureEndedSchema>
   [Channels.HUD_CANCEL]: void
   [Channels.ONBOARDING_DONE]: void
   [Channels.PERMISSION_OPEN_SYSTEM_PREFS]: z.infer<typeof PermissionOpenSystemPrefsSchema>

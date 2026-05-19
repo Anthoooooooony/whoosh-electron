@@ -83,11 +83,13 @@ if (!gotLock) {
       hud: createHudAdapter(getAppWindows),
       audio: createAudioRendererAdapter(getAppWindows, getConfig),
       paste: (text) => pasteText(text),
+      // pasteText 现在返回 PasteResult；类型自动从 @native/paste 推过来到 OrchestratorDeps.paste
       notifyHotkeyDone: () => dispatchSessionDone(),
     })
 
     registerIpcHandlers({
       onAudioChunk: (chunk) => orchestrator.handleAudioChunk(chunk),
+      onAudioCaptureEnded: (reason) => orchestrator.handleAudioCaptureEnded(reason),
       onHudCancel: () => dispatchCancelClick(),
       getConfig: () => getConfig(),
       setConfig: (patch) => setConfig(patch),

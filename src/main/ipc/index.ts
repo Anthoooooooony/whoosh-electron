@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { Channels } from '@shared/ipc/channels.js'
 import type { InvokeContract, SendContract } from '@shared/ipc/types.js'
 import {
+  AudioCaptureEndedSchema,
   AudioChunkSchema,
   OnboardingCompleteStepRequestSchema,
   PermissionOpenSystemPrefsSchema,
@@ -27,6 +28,11 @@ import type { AppConfig, AppConfigPatch, SetApiKeyResult } from '../store/index.
 export interface IpcHandlerDeps {
   /** orchestrator 消费 audio renderer 推上来的每一帧 PCM */
   onAudioChunk(chunk: Buffer): void
+  /**
+   * audio renderer 上报采集异常终止（麦克风权限被撤销 / 设备被抢占）。
+   * orchestrator 把它翻译成 SESSION_ERROR 给 HUD，详见 issue #60。
+   */
+  onAudioCaptureEnded(reason: 'mic-lost'): void
   /** HUD 点击「取消转录」时调；通常 dispatch CANCEL_CLICK 给 FSM */
   onHudCancel(): void
   /** 读取当前配置 */
@@ -193,6 +199,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
   handleSend(Channels.AUDIO_SET_DEVICE, null, () => {
     console.info('[ipc] audio:set-device (stub)')
+  })
+
+  handleSend(Channels.AUDIO_CAPTURE_ENDED, AudioCaptureEndedSchema, (payload) => {
+    deps.onAudioCaptureEnded(payload.reason)
   })
 
   handleSend(Channels.HUD_CANCEL, null, () => {

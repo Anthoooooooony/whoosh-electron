@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ASRCapabilities, ASRProvider, ASRStartOptions } from '@shared/types/provider.js'
 import { SessionOrchestrator } from './index.js'
-import type { AudioRendererPort, HudPort, OrchestratorDeps } from './ports.js'
+import type { AudioRendererPort, HudPort, OrchestratorDeps, PasteResult } from './ports.js'
 
 /** 可控的 fake provider：start/finish 默认立即 resolve；finish 可 arm 成 deferred */
 class FakeProvider extends EventEmitter implements ASRProvider {
@@ -57,11 +57,17 @@ function makeAudio(): AudioRendererPort {
   return { start: vi.fn(), stop: vi.fn(), abort: vi.fn() }
 }
 
-function setup(opts: { provider?: ASRProvider | null; missingCredentialsKey?: string } = {}) {
+function setup(
+  opts: {
+    provider?: ASRProvider | null
+    missingCredentialsKey?: string
+    paste?: (text: string) => PasteResult
+  } = {},
+) {
   const provider = opts.provider === undefined ? new FakeProvider() : opts.provider
   const hud = makeHud()
   const audio = makeAudio()
-  const paste = vi.fn()
+  const paste = vi.fn<(text: string) => PasteResult>(opts.paste ?? (() => ({ ok: true })))
   const notifyHotkeyDone = vi.fn()
   const getProvider = vi.fn((): ASRProvider | null => provider)
   const getMissingCredentialsKey = vi.fn(
@@ -260,6 +266,138 @@ describe('SessionOrchestrator', () => {
       // 2s linger 结束回 idle
       vi.advanceTimersByTime(2000)
       expect(orch.getState()).toBe('idle')
+    })
+  })
+
+  // 对应 issue #60 W3-P1-1：native paste addon 失败不再静默丢字。
+  describe('paste 失败时 surface SESSION_ERROR（issue #60）', () => {
+    it('addon-unavailable → i18nKey=errors.pasteAddonUnavailable + 不回 idle 走 error linger', async () => {
+      const paste = vi.fn(
+        (): PasteResult => ({
+          ok: false,
+          reason: 'addon-unavailable',
+          detail: 'paste.node not found',
+        }),
+      )
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'hello world')
+      await tick()
+
+      expect(paste).toHaveBeenCalledWith('hello world')
+      // final 已经先推到 HUD，然后 surfaceError 把 state 翻成 error
+      expect(hud.final).toHaveBeenCalledWith('hello world', expect.any(Number))
+      expect(orch.getState()).toBe('error')
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteAddonUnavailable' }),
+      )
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(2000)
+      expect(orch.getState()).toBe('idle')
+    })
+
+    it('paste-failed (OS-level) → i18nKey=errors.pasteFailed', async () => {
+      const paste = vi.fn(
+        (): PasteResult => ({ ok: false, reason: 'paste-failed', detail: 'a11y revoked' }),
+      )
+      const { orch, provider, hud } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'text')
+      await tick()
+
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteFailed' }),
+      )
+      expect(orch.getState()).toBe('error')
+    })
+
+    it('paste 实现里直接抛异常 → 降级到 paste-failed 分支', async () => {
+      const paste = vi.fn((): PasteResult => {
+        throw new Error('adapter bug')
+      })
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'text')
+      await tick()
+
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteFailed', message: 'adapter bug' }),
+      )
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // 对应 issue #60 W4-P1-2：麦克风权限被吊销 / 设备被抢占时，
+  // audio renderer 通过 AUDIO_CAPTURE_ENDED 触发 handleAudioCaptureEnded。
+  describe('handleAudioCaptureEnded（issue #60）', () => {
+    it('recording 态 mic-lost → surface i18nKey=errors.micPermissionLost，provider abort', async () => {
+      const { orch, provider, hud, notifyHotkeyDone } = setup()
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      expect(orch.getState()).toBe('recording')
+
+      orch.handleAudioCaptureEnded('mic-lost')
+
+      expect(fake.abort).toHaveBeenCalledTimes(1)
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.micPermissionLost' }),
+      )
+      expect(orch.getState()).toBe('error')
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+    })
+
+    it('用户主动 abort 后到来的 stale capture-ended → 抑制，不刷错', async () => {
+      const { orch, hud, notifyHotkeyDone } = setup()
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('ABORT_CANCEL')
+      const notifyCallsAfterAbort = notifyHotkeyDone.mock.calls.length
+      const errorCallsAfterAbort = vi.mocked(hud.error).mock.calls.length
+
+      orch.handleAudioCaptureEnded('mic-lost')
+
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(notifyCallsAfterAbort)
+      expect(hud.error).toHaveBeenCalledTimes(errorCallsAfterAbort)
+    })
+
+    it('idle 态收到 stale capture-ended → no-op', () => {
+      const { orch, hud, notifyHotkeyDone } = setup()
+      orch.handleAudioCaptureEnded('mic-lost')
+      expect(hud.error).not.toHaveBeenCalled()
+      expect(notifyHotkeyDone).not.toHaveBeenCalled()
+      expect(orch.getState()).toBe('idle')
+    })
+
+    it('processing 态 mic-lost 也会 surface（兜底）', async () => {
+      const { orch, provider, hud } = setup()
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      expect(orch.getState()).toBe('processing')
+
+      orch.handleAudioCaptureEnded('mic-lost')
+      expect((provider as FakeProvider).abort).toHaveBeenCalled()
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.micPermissionLost' }),
+      )
     })
   })
 

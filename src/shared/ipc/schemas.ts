@@ -43,6 +43,14 @@ export const AudioStartSchema = z.object({
   deviceId: z.string().nullable(),
 })
 
+// audio renderer → main：上报采集异常终止（issue #60 W4-P1-2）
+// 现在只有「mic-lost」一种 reason —— MediaStreamTrack.ended 触发，
+// 通常意味着用户在系统设置里撤销了麦克风权限 / 设备被抢占。
+// 未来可扩到 'device-removed' / 'audio-context-suspended' 等，留枚举位。
+export const AudioCaptureEndedSchema = z.object({
+  reason: z.enum(['mic-lost']),
+})
+
 // ───────────────────────────────────────────
 // session:*
 // ───────────────────────────────────────────

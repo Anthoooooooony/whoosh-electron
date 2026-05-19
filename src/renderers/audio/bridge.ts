@@ -12,11 +12,16 @@
 // 并发：startCapture / stopCapture 用 pending promise 串行化。`active` 在 startCapture
 // 末尾才置位，若不串行化，短按场景（START 后 50ms 内就 ABORT）的两次调用会各开一套
 // getUserMedia + AudioContext，先完成的那套无人 stop 而泄漏。
+//
+// 错误兜底：MediaStreamTrack.onended 触发（用户系统设置撤销麦克风权限 / 设备拔出）
+// → 通过 AUDIO_CAPTURE_ENDED 通知 main，让 orchestrator 走 surfaceError 而不是 silent
+// drop（见 issue #60 W4-P1-2）。
 
 // Vite 的 worker 管线会转译 + 打包 processor.ts 成独立 chunk，?worker&url 拿到它的 URL。
 // 用 ?url 会把 .ts 当静态资源不转译，打包后 addModule 拿到原始 TS 直接 SyntaxError（见 #41）。
 import workletUrl from './worklet/processor.ts?worker&url'
 import { Channels } from '@shared/ipc/channels.js'
+import { wireTrackEndedHandler } from './track-watch.js'
 
 interface CaptureSession {
   stop(): Promise<void>
@@ -46,6 +51,11 @@ async function openCaptureSession(deviceId: string | null): Promise<CaptureSessi
   const node = new AudioWorkletNode(ctx, 'downsample-processor')
 
   let chunkCount = 0
+  let toreDown = false
+  // teardown 与 offTrackEnded 互相引用：teardown 要 off listener，listener 要触发 teardown。
+  // 用 let 先占位，下面把真实回调赋上。
+  let offTrackEnded: () => void = () => {}
+
   node.port.onmessage = (event: MessageEvent<ArrayBuffer>): void => {
     const u8 = new Uint8Array(event.data)
     window.ipc.send(Channels.AUDIO_CHUNK, { chunk: u8, timestamp: Date.now() })
@@ -55,20 +65,34 @@ async function openCaptureSession(deviceId: string | null): Promise<CaptureSessi
   source.connect(node)
   // 故意不 connect node 到 ctx.destination
 
+  const teardown = async (): Promise<void> => {
+    if (toreDown) return
+    toreDown = true
+    offTrackEnded()
+    node.port.onmessage = null
+    node.disconnect()
+    source.disconnect()
+    stream.getTracks().forEach((t) => t.stop())
+    if (ctx.state !== 'closed') await ctx.close()
+    console.info(`[audio] capture stopped · total ${chunkCount} chunks`)
+  }
+
+  const capture: CaptureSession = { stop: teardown }
+
+  // 麦克风权限被撤销 / 设备被抢占时 track 会 ended：通知 main → SESSION_ERROR。
+  // 顺手把本地 session 拆掉，避免后续 stopCapture 重复拆；
+  // 用 active === capture 判定确保不覆盖刚切换上来的新 session。
+  offTrackEnded = wireTrackEndedHandler(stream, () => {
+    if (active === capture) active = null
+    void teardown().catch(() => {})
+    window.ipc.send(Channels.AUDIO_CAPTURE_ENDED, { reason: 'mic-lost' })
+  })
+
   console.info(
     `[audio] capture started · inputRate=${ctx.sampleRate}Hz · deviceId=${deviceId ?? 'default'}`,
   )
 
-  return {
-    async stop(): Promise<void> {
-      node.port.onmessage = null
-      node.disconnect()
-      source.disconnect()
-      stream.getTracks().forEach((t) => t.stop())
-      await ctx.close()
-      console.info(`[audio] capture stopped · total ${chunkCount} chunks`)
-    },
-  }
+  return capture
 }
 
 export async function startCapture(deviceId: string | null): Promise<void> {

@@ -33,6 +33,17 @@ export interface AudioRendererPort {
   abort(): void
 }
 
+/**
+ * paste 调用结果 —— 三态 discriminated union。
+ *
+ * 与 src/native/paste/index.ts 的 PasteResult 镜像，但 port 层重新定义以保持
+ * orchestrator 不依赖 native 模块；adapter 负责翻译。
+ */
+export type PasteResult =
+  | { ok: true }
+  | { ok: false; reason: 'addon-unavailable'; detail: string }
+  | { ok: false; reason: 'paste-failed'; detail: string }
+
 export interface OrchestratorDeps {
   /** 拉取当前配好的 ASR provider；null = 未配置（onboarding 未完成或凭据缺失） */
   getProvider(): ASRProvider | null
@@ -44,8 +55,12 @@ export interface OrchestratorDeps {
   getMissingCredentialsKey(): string
   hud: HudPort
   audio: AudioRendererPort
-  /** 把 final 文本注入当前焦点 app */
-  paste(text: string): void
+  /**
+   * 把 final 文本注入当前焦点 app。
+   * 返回 PasteResult —— 失败时 orchestrator 翻成 SESSION_ERROR 给 HUD，
+   * 不再 console.warn 静默丢字（issue #60）。
+   */
+  paste(text: string): PasteResult
   /** session 终止（commit 完成 / abort 完成 / error 处理完）时回调 hotkey FSM 派发 SESSION_DONE */
   notifyHotkeyDone(): void
 }

@@ -14,6 +14,7 @@ export const Channels = {
   AUDIO_START: 'audio:start', // broadcast: main → audio-renderer
   AUDIO_STOP: 'audio:stop', // broadcast
   AUDIO_ABORT: 'audio:abort', // broadcast
+  AUDIO_CAPTURE_ENDED: 'audio:capture-ended', // send: audio-renderer → main（麦克风权限撤销 / 设备被抢占）
 
   // 会话
   SESSION_PARTIAL: 'session:partial', // broadcast: main → hud
