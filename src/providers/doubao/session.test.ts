@@ -6,7 +6,7 @@
 
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { WebSocketServer, type WebSocket as WSServerSocket } from 'ws'
+import WebSocket, { WebSocketServer, type WebSocket as WSServerSocket } from 'ws'
 import { Flags, MessageType } from './constants.js'
 import { decodeFrame, encodeControlFrame } from './seed-codec.js'
 import { DoubaoSession } from './session.js'
@@ -128,5 +128,101 @@ describe('DoubaoSession.finish() 状态守卫', () => {
     expect(session.getState()).toBe('closed')
 
     await expect(session.finish()).rejects.toThrow(/session-not-streaming/)
+  })
+})
+
+// issue #61 —— 弱网下 ws.send 会把帧堆进 socket buffer，几十秒就能涨到 MB 级。
+// pushAudio 必须在 bufferedAmount 超阈值时丢新帧（drop-newest），并把丢弃量、
+// 历史最大 bufferedAmount 记到 session 内部 metrics，cleanup 时一次性 emit。
+describe('DoubaoSession.pushAudio() 背压', () => {
+  let mock: Awaited<ReturnType<typeof startMockServer>>
+
+  beforeEach(async () => {
+    mock = await startMockServer()
+  })
+
+  afterEach(async () => {
+    await mock.close()
+  })
+
+  // 直接操纵 session 内部的 ws 实例（强转为可写句柄），覆盖 bufferedAmount 为
+  // 受测试控制的值。比启动一个慢速 mock server 更可控、不依赖时序。
+  function stubBufferedAmount(ws: WebSocket, value: number): void {
+    Object.defineProperty(ws, 'bufferedAmount', {
+      configurable: true,
+      get: () => value,
+    })
+  }
+
+  it('bufferedAmount 超阈值时不调 send 且 dropCount 自增', async () => {
+    attachHandshakeAck(mock.server)
+    const session = new DoubaoSession({
+      auth: { mode: 'new', apiKey: 'k' },
+      endpointOverride: mock.url,
+    })
+    await session.start()
+
+    // 从 session 拿到内部 ws；TypeScript 上私有，但运行时可访问
+    const ws = (session as unknown as { ws: WebSocket }).ws
+    expect(ws).toBeTruthy()
+
+    let sendCalls = 0
+    const originalSend = ws.send.bind(ws)
+    ws.send = ((...args: Parameters<WebSocket['send']>) => {
+      sendCalls += 1
+      return originalSend(...args)
+    }) as typeof ws.send
+
+    // 256KB + 1 字节 → 超 WS_BACKPRESSURE_THRESHOLD_BYTES (256*1024)
+    stubBufferedAmount(ws, 256 * 1024 + 1)
+
+    session.pushAudio(Buffer.alloc(1280))
+    session.pushAudio(Buffer.alloc(1280))
+    session.pushAudio(Buffer.alloc(1280))
+
+    expect(sendCalls).toBe(0)
+    expect(session.getMetrics().dropCount).toBe(3)
+    expect(session.getMetrics().maxBufferedAmount).toBe(256 * 1024 + 1)
+    // 丢帧不应推进状态：从未真正 send 过音频帧，session 还在 ready
+    expect(session.getState()).toBe('ready')
+
+    session.abort()
+  })
+
+  it('bufferedAmount 回落到阈值下后，后续 frame 正常 send', async () => {
+    attachHandshakeAck(mock.server)
+    const session = new DoubaoSession({
+      auth: { mode: 'new', apiKey: 'k' },
+      endpointOverride: mock.url,
+    })
+    await session.start()
+
+    const ws = (session as unknown as { ws: WebSocket }).ws
+    expect(ws).toBeTruthy()
+
+    let sendCalls = 0
+    const originalSend = ws.send.bind(ws)
+    ws.send = ((...args: Parameters<WebSocket['send']>) => {
+      sendCalls += 1
+      return originalSend(...args)
+    }) as typeof ws.send
+
+    // 第一帧拥塞 → 丢
+    stubBufferedAmount(ws, 300 * 1024)
+    session.pushAudio(Buffer.alloc(1280))
+    expect(sendCalls).toBe(0)
+    expect(session.getMetrics().dropCount).toBe(1)
+
+    // bufferedAmount 回落 → 正常 send
+    stubBufferedAmount(ws, 8 * 1024)
+    session.pushAudio(Buffer.alloc(1280))
+    session.pushAudio(Buffer.alloc(1280))
+    expect(sendCalls).toBe(2)
+    expect(session.getMetrics().dropCount).toBe(1)
+    expect(session.getState()).toBe('streaming')
+    // maxBufferedAmount 保留拥塞期间观察到的峰值
+    expect(session.getMetrics().maxBufferedAmount).toBe(300 * 1024)
+
+    session.abort()
   })
 })

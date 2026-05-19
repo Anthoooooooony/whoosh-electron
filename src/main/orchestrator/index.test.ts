@@ -3,7 +3,24 @@
 
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AppConfig } from '@shared/ipc/schemas.js'
 import type { ASRCapabilities, ASRProvider, ASRStartOptions } from '@shared/types/provider.js'
+
+// orchestrator 在 partial / final 路径调 debugTranscript → isVerboseLoggingEnabled()。
+// 测试环境无 Electron 上下文，需 stub 掉 electron-store 实例化。
+vi.mock('../store/index.js', () => ({
+  getConfig: (): AppConfig => ({
+    audio: { inputDeviceId: null },
+    providers: {},
+    currentProviderId: 'doubao',
+    behavior: { showHudWhenRecording: true, openAtLogin: false },
+    logging: { verbose: false },
+    ui: { locale: 'zh-CN' },
+    onboarding: { completedSteps: [], done: false },
+  }),
+  isVerboseLoggingEnabled: (): boolean => false,
+}))
+
 import { SessionOrchestrator } from './index.js'
 import type { AudioRendererPort, HudPort, OrchestratorDeps, PasteResult } from './ports.js'
 

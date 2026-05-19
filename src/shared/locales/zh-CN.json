@@ -83,6 +83,7 @@
       "diagnostics": "诊断",
       "verbose": "详细日志",
       "verboseWarn": "⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。",
+      "verboseHint": "开启后转录文本会写本地日志，仅留本机不上传。",
       "privacy": "隐私",
       "telemetry": "遥测",
       "telemetryHint": "不会收集任何使用数据。",

@@ -16,6 +16,7 @@
 
 import type { ASRError, ASRProvider } from '@shared/types/provider.js'
 import type { HotkeyAction } from '../hotkey/fsm.js'
+import { debugTranscript } from '../log.js'
 import type { OrchestratorDeps, PasteResult } from './ports.js'
 
 type State = 'idle' | 'recording' | 'processing' | 'pasting' | 'error'
@@ -165,6 +166,7 @@ export class SessionOrchestrator {
 
   private onProviderPartial(text: string): void {
     if (this.cancelled) return
+    debugTranscript('partial', { text })
     this.deps.hud.partial(text)
   }
 
@@ -178,6 +180,7 @@ export class SessionOrchestrator {
 
     this.state = 'pasting'
     const durationMs = Date.now() - this.sessionStartMs
+    debugTranscript('final', { text, durationMs })
     this.deps.hud.final(text, durationMs)
 
     // paste 失败两种语义：
