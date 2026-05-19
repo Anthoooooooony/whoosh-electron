@@ -86,6 +86,19 @@ export interface DoubaoSessionConfig {
 
 type State = 'idle' | 'connecting' | 'ready' | 'streaming' | 'finishing' | 'closed' | 'error'
 
+// 背压阈值 —— 弱网下 ws.send 会把未发出的帧堆进 socket buffer，几十秒就能涨到 MB 级。
+// 256KB ≈ 200 帧 16kHz mono s16le PCM ≈ 8s 音频缓冲量，超过即认为「上行已经撑不住」：
+// 此时丢新帧让 buffer 自然回落，比让旧帧积压更接近实时；ASR 的 partial 会在拥塞窗口
+// 内出现识别空洞，是有意的 graceful degradation。
+const WS_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024
+
+export interface DoubaoSessionMetrics {
+  /** pushAudio 因 bufferedAmount 超阈值而丢弃的帧数 */
+  dropCount: number
+  /** 整个 session 期间观察到的 ws.bufferedAmount 最大值（用于事后调阈值） */
+  maxBufferedAmount: number
+}
+
 // 标准的 EventEmitter typed-events 写法（interface + class 同名 declaration merging）
 // 等价于 TypedEmitter<{...}>；ESLint 的 no-unsafe-declaration-merging 在此为误报。
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -107,6 +120,13 @@ export class DoubaoSession extends EventEmitter {
   private firstResponseResolve: (() => void) | null = null
   private firstResponseReject: ((err: Error) => void) | null = null
   private retried = false
+  // 仅 session 内部观察用；绝不在 info 级日志输出（避免间接泄漏识别活动节奏）。
+  // cleanup 时若有非零信号一次性 emit 到 debug 日志（与 #62 verbose toggle 协同，
+  // 当前 console.debug 占位，等 logging.verbose 落地后改走 logger）。
+  private readonly metrics: DoubaoSessionMetrics = {
+    dropCount: 0,
+    maxBufferedAmount: 0,
+  }
 
   constructor(private readonly config: DoubaoSessionConfig) {
     super()
@@ -116,6 +136,11 @@ export class DoubaoSession extends EventEmitter {
 
   getState(): State {
     return this.state
+  }
+
+  /** 仅测试与 debug 路径调用；不要在产品代码热路径上读 */
+  getMetrics(): Readonly<DoubaoSessionMetrics> {
+    return this.metrics
   }
 
   /* ───── public lifecycle ───── */
@@ -130,6 +155,19 @@ export class DoubaoSession extends EventEmitter {
   pushAudio(chunk: Buffer): void {
     if (this.state !== 'ready' && this.state !== 'streaming') return
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+
+    // 背压：ws.send 不阻塞、socket buffer 不会自动回压采集端，所以这里手动判断。
+    // 超阈值 → 丢新帧（drop-newest）：sequence 不递增，对端不会感知到「跳号」；
+    // 同时记 metrics 供事后排查。不 emit error —— 拥塞是短暂状态，不应中断会话。
+    const buffered = this.ws.bufferedAmount
+    if (buffered > this.metrics.maxBufferedAmount) {
+      this.metrics.maxBufferedAmount = buffered
+    }
+    if (buffered > WS_BACKPRESSURE_THRESHOLD_BYTES) {
+      this.metrics.dropCount += 1
+      return
+    }
+
     this.state = 'streaming'
     this.sequence += 1
     const frame = encodeAudioFrame({
@@ -455,6 +493,18 @@ export class DoubaoSession extends EventEmitter {
       this.ws = null
     }
     if ((this.state as State) !== 'error') this.state = 'closed'
+    this.emitMetricsOnClose()
+  }
+
+  // 会话收尾时把背压观察值落到 debug 日志，方便事后判断阈值是否合理。
+  // 仅 dropCount > 0 或 maxBufferedAmount 显著（>1 帧 ~3.2KB）才输出，避免噪音；
+  // 用 console.debug 占位，#62 落地 logger.verbose 后改走它。
+  private emitMetricsOnClose(): void {
+    const { dropCount, maxBufferedAmount } = this.metrics
+    if (dropCount === 0 && maxBufferedAmount < 4 * 1024) return
+    console.debug(
+      `[doubao] ws backpressure metrics · drop=${dropCount} maxBuffered=${maxBufferedAmount}B threshold=${WS_BACKPRESSURE_THRESHOLD_BYTES}B`,
+    )
   }
 
   private isRetryable(err: unknown): boolean {
