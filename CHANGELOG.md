@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.1](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.3.0...v0.3.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **hotkey:** document uIOhook single-process register constraint ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([31838c2](https://github.com/Anthoooooooony/whoosh-electron/commit/31838c216a73ab78a7e1685a23e9225cc1ef7a3f))
+* **housekeeping:** cross-platform polish + lint strictness + Round 2 follow-ups ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([a46bd26](https://github.com/Anthoooooooony/whoosh-electron/commit/a46bd2685fe9f17a34575ce8108387818bef9b5d))
+* **lint:** elevate no-explicit-any to error and clean violations ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([ae774d8](https://github.com/Anthoooooooony/whoosh-electron/commit/ae774d876002cf5e413cc0d3b6f54472fd935005))
+* **logging:** use t() in LogsPane and skip zod parse on hot path ([#62](https://github.com/Anthoooooooony/whoosh-electron/issues/62)) ([327bfea](https://github.com/Anthoooooooony/whoosh-electron/commit/327bfea9047b8a9c98705d2b1420ca2ef297a265))
+* **logging:** wire verbose toggle to gate transcript debug logs ([#62](https://github.com/Anthoooooooony/whoosh-electron/issues/62)) ([ecfa322](https://github.com/Anthoooooooony/whoosh-electron/commit/ecfa3220b11c9cd505b2ab4998d7d2e60130e40c))
+* **logging:** wire verbose toggle to gate transcript debug logs ([#62](https://github.com/Anthoooooooony/whoosh-electron/issues/62)) ([e7cea03](https://github.com/Anthoooooooony/whoosh-electron/commit/e7cea030bc291c7784955aad758a29e675e57ff2))
+* **native:** align Windows clipboard restore delay with macOS ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([690a644](https://github.com/Anthoooooooony/whoosh-electron/commit/690a644fb800560343256fe54c27de043b99f117))
+* **platform:** narrow Platform type to darwin | win32 ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([44b4dcb](https://github.com/Anthoooooooony/whoosh-electron/commit/44b4dcbaf0e0781ce5afcae5993fde4aa1ca8853))
+* **provider:** apply backpressure on doubao ws pushAudio ([#61](https://github.com/Anthoooooooony/whoosh-electron/issues/61)) ([5de7d7c](https://github.com/Anthoooooooony/whoosh-electron/commit/5de7d7cde3cd8393f0527409c1ffab9cd5392c48))
+* **provider:** apply backpressure on doubao ws pushAudio ([#61](https://github.com/Anthoooooooony/whoosh-electron/issues/61)) ([d5c8e60](https://github.com/Anthoooooooony/whoosh-electron/commit/d5c8e601a9b0315dfcd98965427096c1d3b8f58c))
+* **provider:** split finish() errors and clarify backpressure comments ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([09f045f](https://github.com/Anthoooooooony/whoosh-electron/commit/09f045f292877560de2df1cb0575ae6b6a59c0db))
+* **session:** add coverage for pasting stale capture-ended and AudioCaptureEndedSchema ([#60](https://github.com/Anthoooooooony/whoosh-electron/issues/60)) ([45ad430](https://github.com/Anthoooooooony/whoosh-electron/commit/45ad43083cd2598ac6c97c2c7b0e8f3394bdc5d1))
+* **session:** surface errors instead of silently dropping at paste and mic-lost ([#60](https://github.com/Anthoooooooony/whoosh-electron/issues/60)) ([a54f41d](https://github.com/Anthoooooooony/whoosh-electron/commit/a54f41d78a572ac063498cfde02fdb78a1d93b4d))
+* **session:** surface errors instead of silently dropping at paste and mic-lost ([#60](https://github.com/Anthoooooooony/whoosh-electron/issues/60)) ([93d3712](https://github.com/Anthoooooooony/whoosh-electron/commit/93d3712275d23a8100b92796fd525f6e6247e45a))
+* **store:** handle encryptString throw in setApiKey ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([4265d7b](https://github.com/Anthoooooooony/whoosh-electron/commit/4265d7b5f5003bbdbb2a4ed4bb2667aa466e0ec9))
+* **ui:** align onboarding setTestMsg ordering and annotate Sequoia URL drift ([#63](https://github.com/Anthoooooooony/whoosh-electron/issues/63)) ([6b65fc5](https://github.com/Anthoooooooony/whoosh-electron/commit/6b65fc508a29e871578946300f39b1bd8bcd8c8f))
+
 ## [0.3.0](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.8...v0.3.0) (2026-05-19)
 
 
