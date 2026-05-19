@@ -77,10 +77,14 @@ export class SessionOrchestrator {
 
     const provider = this.deps.getProvider()
     if (!provider) {
+      // i18n key 取自 registry 的 missingCredentialsKey；message 是 main 进程的 fallback 文案
+      // （HUD 渲染时优先 t(i18nKey)，message 仅在缺资源时降级用），刻意非定语、不挂 provider 名
+      const i18nKey = this.deps.getMissingCredentialsKey()
       this.surfaceError({
         code: 'AUTH',
-        message: '尚未配置豆包凭据（请在 Settings 填写或设置 .env DOUBAO_API_KEY）',
+        message: 'provider credentials missing',
         retryable: false,
+        i18nKey,
       })
       this.deps.notifyHotkeyDone()
       return

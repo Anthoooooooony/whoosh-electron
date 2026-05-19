@@ -5,15 +5,16 @@
 //   - permission handler 允许 media（getUserMedia）
 //   - 创建四个 BrowserWindow
 //   - 初始化 SessionOrchestrator + 注册 IPC handler + 启动 hotkey listener
-//   - 从 store + safeStorage 读豆包凭据；`.env` 仍作 dev override 兜底
+//   - 通过 providerRegistry 路由当前 providerId 到具体 entry；不再硬编码豆包
 
 import { app, session } from 'electron'
-import { DoubaoProvider } from '@providers/doubao/index.js'
 import { pasteText } from '@native/paste/index.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { SessionOrchestrator } from './orchestrator/index.js'
 import { createAudioRendererAdapter, createHudAdapter } from './orchestrator/adapters.js'
-import { hasEnvCredentials, resolveDoubaoConfig, testDoubaoConnection } from './doubao-config.js'
+import { hasEnvCredentials } from './doubao-config.js'
+import { getProviderEntry } from './providers/registry.js'
+import type { ASRProvider } from '@shared/types/provider.js'
 import {
   dispatchCancelClick,
   dispatchSessionDone,
@@ -24,6 +25,27 @@ import { createAllWindows, getAppWindows, markAppQuitting } from './windows.js'
 import { getApiKey, getConfig, setApiKey, setConfig } from './store/index.js'
 import { createTray, destroyTray } from './tray.js'
 import { startPeriodicUpdateCheck, stopPeriodicUpdateCheck } from './updater/index.js'
+
+/** registry 不命中时的兜底 i18n key —— 用于「currentProviderId 与代码版本不一致」 */
+const FALLBACK_MISSING_CREDENTIALS_KEY = 'provider.missingCredentials.unknown'
+
+/**
+ * 走 registry 解析当前 providerId 的 entry + 实例化。
+ * 任一环节失败（id 未注册、fromStore 返 null 即缺凭据）都返回 null，
+ * 由 orchestrator 转成 SESSION_ERROR 走 missingCredentialsKey 路径。
+ */
+function makeCurrentProvider(): ASRProvider | null {
+  const cfg = getConfig()
+  const entry = getProviderEntry(cfg.currentProviderId)
+  if (!entry) {
+    console.warn(`[main] provider not registered: ${cfg.currentProviderId}`)
+    return null
+  }
+  const apiKey = getApiKey(entry.id)
+  const runtimeCfg = entry.fromStore(cfg, apiKey)
+  if (!runtimeCfg) return null
+  return entry.factory(runtimeCfg)
+}
 
 /* ───── lifecycle ───── */
 
@@ -53,9 +75,10 @@ if (!gotLock) {
     }
 
     const orchestrator = new SessionOrchestrator({
-      getProvider: () => {
-        const config = resolveDoubaoConfig()
-        return config ? new DoubaoProvider(config) : null
+      getProvider: () => makeCurrentProvider(),
+      getMissingCredentialsKey: () => {
+        const entry = getProviderEntry(getConfig().currentProviderId)
+        return entry?.missingCredentialsKey ?? FALLBACK_MISSING_CREDENTIALS_KEY
       },
       hud: createHudAdapter(getAppWindows),
       audio: createAudioRendererAdapter(getAppWindows, getConfig),
@@ -77,10 +100,9 @@ if (!gotLock) {
         w?.settings.focus()
       },
       testProviderConnection: async (req) => {
-        if (req.providerId !== 'doubao') {
-          return { ok: false, error: `unknown provider ${req.providerId}` }
-        }
-        return testDoubaoConnection(req.credentials)
+        const entry = getProviderEntry(req.providerId)
+        if (!entry) return { ok: false, error: `provider-not-registered:${req.providerId}` }
+        return entry.testConnection(req.credentials)
       },
     })
 

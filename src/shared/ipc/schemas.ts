@@ -16,7 +16,10 @@ export const ErrorCodeSchema = z.enum([
   'DURATION_TOO_SHORT',
   'UNKNOWN',
 ])
-export const ProviderIdSchema = z.enum(['doubao']) // v1 单 provider；扩展时加 enum 值
+// providerId 之前 z.enum(['doubao'])，加 provider 要回头改 schema。
+// 改成 string + min(1)：registry 是注册表的运行期单一来源，schema 只把它当不透明 id。
+// 越界 id 会在 main 端经 getProviderEntry 失败 → ipc 返回 provider-not-registered。
+export const ProviderIdSchema = z.string().min(1)
 
 // ───────────────────────────────────────────
 // audio:*
@@ -50,9 +53,13 @@ export const SessionFinalSchema = z.object({
   text: z.string(),
   durationMs: z.number().int().nonnegative(),
 })
+// i18nKey：main 进程不直接调 t()（避免在 main 启用 i18next 增大启动面），
+// 改成把 i18n key 透传给 renderer。renderer 优先 t(i18nKey)，回退到 message。
+// message 仍保留 —— provider 内部抛出的英文/技术错误以原文经此通道流到 HUD。
 export const SessionErrorSchema = z.object({
   code: ErrorCodeSchema,
   message: z.string(),
+  i18nKey: z.string().optional(),
 })
 
 // ───────────────────────────────────────────

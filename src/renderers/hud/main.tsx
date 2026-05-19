@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { useTranslation } from 'react-i18next'
 import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
 
@@ -24,9 +25,13 @@ function formatTimer(elapsedMs: number): string {
 }
 
 function App(): React.ReactElement | null {
+  const { t } = useTranslation()
   const [state, setState] = useState<ServerState>('hidden')
   const [hover, setHover] = useState(false)
   const [partial, setPartial] = useState<string>('')
+  // 错误展示用「i18nKey 优先、message fallback」两段结构：main 端透传 i18nKey 时走 t()，
+  // 否则直接用 message 原文（provider 内部抛出的英文/技术错误不应被强制 i18n）
+  const [errorI18nKey, setErrorI18nKey] = useState<string>('')
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [, forceRerender] = useState(0)
   const recordStartRef = useRef<number>(0)
@@ -49,6 +54,7 @@ function App(): React.ReactElement | null {
       setState('hidden')
       setPartial('')
       setErrorMsg('')
+      setErrorI18nKey('')
       setHover(false)
     })
     const offPartial = window.ipc.on(Channels.SESSION_PARTIAL, (payload) => {
@@ -58,7 +64,8 @@ function App(): React.ReactElement | null {
       if (payload?.text) setPartial(payload.text)
     })
     const offError = window.ipc.on(Channels.SESSION_ERROR, (payload) => {
-      setErrorMsg(payload?.message ?? '未知错误')
+      setErrorI18nKey(payload?.i18nKey ?? '')
+      setErrorMsg(payload?.message ?? '')
     })
 
     return () => {
@@ -93,6 +100,11 @@ function App(): React.ReactElement | null {
 
   const display: DisplayState = hover && state === 'recording' ? 'hover' : state
   const elapsedMs = recordStartRef.current ? Date.now() - recordStartRef.current : 0
+  // i18nKey 命中 → 走 t()；缺 key 时退到 message；都没有就保底「unknownError」
+  // 注意 t() 在 fallback 模式下找不到 key 时会回 key 自己 —— 这里显式判一遍以让降级链可控
+  const resolvedError = errorI18nKey
+    ? t(errorI18nKey, { defaultValue: errorMsg || t('hud.unknownError') })
+    : errorMsg || t('hud.unknownError')
 
   const className =
     'hud' +
@@ -183,7 +195,7 @@ function App(): React.ReactElement | null {
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          <span>{errorMsg || '出错了'}</span>
+          <span>{resolvedError}</span>
         </div>
       )}
     </div>

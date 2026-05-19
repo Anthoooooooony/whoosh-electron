@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { Channels } from '@shared/ipc/channels.js'
 import { initI18n } from '@shared/i18n/index.js'
 import { triggerKeyLabel, type Platform } from '@shared/trigger-key.js'
+import { DoubaoStoreConfigSchema } from '@shared/types/providers/doubao-config.js'
 import { useAudioInputDevices } from '../_shared/use-audio-devices.js'
 
 initI18n()
@@ -132,7 +133,9 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
       })
       if (key) setApiKey(key)
       const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)
-      const stored = (cfg.providers['doubao']?.['resourceId'] as string) ?? null
+      // safeParse 落到强类型，去掉过去的 `as string` 断言
+      const parsed = DoubaoStoreConfigSchema.safeParse(cfg.providers['doubao'] ?? {})
+      const stored = parsed.success ? parsed.data.resourceId : null
       if (stored) setResourceId(stored)
     })()
   }, [])
