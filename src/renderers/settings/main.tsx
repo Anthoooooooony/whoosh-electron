@@ -544,6 +544,7 @@ interface LogsPaneProps {
 }
 
 function LogsPane({ config, updateConfig }: LogsPaneProps): React.ReactElement {
+  const { t } = useTranslation()
   return (
     <>
       <div className="pane-header">
@@ -557,15 +558,19 @@ function LogsPane({ config, updateConfig }: LogsPaneProps): React.ReactElement {
         <div className="card">
           <div className="row">
             <div className="row-info">
-              <span className="row-label">详细日志</span>
+              <span className="row-label" title={t('settings.logs.verboseHint')}>
+                详细日志
+              </span>
               <span className="row-hint" style={{ color: 'var(--warn)' }}>
                 ⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。
               </span>
+              <span className="row-hint">{t('settings.logs.verboseHint')}</span>
             </div>
             <div className="row-control">
               <span
                 className="toggle"
                 data-on={config.logging.verbose}
+                title={t('settings.logs.verboseHint')}
                 onClick={() =>
                   void updateConfig({
                     logging: { ...config.logging, verbose: !config.logging.verbose },
