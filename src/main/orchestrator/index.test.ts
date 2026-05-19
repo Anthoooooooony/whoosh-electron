@@ -399,6 +399,57 @@ describe('SessionOrchestrator', () => {
         expect.objectContaining({ i18nKey: 'errors.micPermissionLost' }),
       )
     })
+
+    // pasting 态不在 handleAudioCaptureEnded 的合法集合内（state 守卫只允许
+    // recording / processing），但 paste → final → idle 中间这个窗口
+    // 仍可能收到迟到的 stale 信号。显式断言守卫行为，防止未来改动把它放穿。
+    it('pasting 态收到 stale capture-ended → no-op', async () => {
+      // 用 paste 钩子在 onProviderFinal 调到 deps.paste() 的瞬间触发
+      // handleAudioCaptureEnded —— 此时 state 已经是 'pasting'。
+      const observed = {
+        stateDuringPaste: null as string | null,
+        notifyCallsAtPasteEntry: -1,
+        errorCallsAtPasteEntry: -1,
+      }
+      // 用 object holder 暴露闭包变量，避开 prefer-const 与 paste 必须先于 setup() 定义的矛盾
+      const refs: {
+        orch: SessionOrchestrator | null
+        hud: HudPort | null
+        notify: ReturnType<typeof vi.fn> | null
+      } = { orch: null, hud: null, notify: null }
+      const paste = vi.fn((): PasteResult => {
+        const { orch: o, hud: h, notify: n } = refs
+        if (o === null || h === null || n === null) throw new Error('refs not wired')
+        observed.stateDuringPaste = o.getState()
+        observed.notifyCallsAtPasteEntry = n.mock.calls.length
+        observed.errorCallsAtPasteEntry = vi.mocked(h.error).mock.calls.length
+        o.handleAudioCaptureEnded('mic-lost')
+        return { ok: true }
+      })
+
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      refs.orch = orch
+      refs.hud = hud
+      refs.notify = notifyHotkeyDone
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'hello')
+      await tick()
+
+      // 确认我们确实是在 pasting 态触发的 handleAudioCaptureEnded
+      expect(observed.stateDuringPaste).toBe('pasting')
+      // pasting 不在合法集合内 → 守卫早返、不刷错、不重复 notify
+      expect(vi.mocked(hud.error).mock.calls.length).toBe(observed.errorCallsAtPasteEntry)
+      // paste 成功后的一次 notifyHotkeyDone 在 stale capture-ended 后才发生，
+      // 所以最终次数 = 进入 paste 时的次数 + 1（成功路径），而不是 +2
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(observed.notifyCallsAtPasteEntry + 1)
+      // paste 成功路径正常回到 idle，没有被 stale 信号污染
+      expect(orch.getState()).toBe('idle')
+    })
   })
 
   describe('ws 在 finishing 期间断开', () => {
