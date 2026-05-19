@@ -28,10 +28,11 @@ jobs:
         run: gh workflow run release.yml --repo "$REPO" --ref "$TAG" -f tag="$TAG"
 
       # release PR 创建/更新后，pull_request 事件同样被递归锁屏蔽，需主动 dispatch CI。
-      # 注意：只在 prs_created（不含 releases_created）时跑——release 合并后该分支已删，
-      # 会触发 "No ref found"。
+      # 注意：prs_created 仅首次为 true；后续 push 刷新同一 PR 时是 prs_updated。
+      # 二者都得 dispatch，否则 release PR 合并前没有最新绿标。
+      # 不含 releases_created——release 合并后该分支已删，会触发 "No ref found"。
       - name: Dispatch CI on release PR branch
-        if: ${{ steps.rp.outputs.prs_created == 'true' }}
+        if: ${{ steps.rp.outputs.prs_created == 'true' || steps.rp.outputs.prs_updated == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
