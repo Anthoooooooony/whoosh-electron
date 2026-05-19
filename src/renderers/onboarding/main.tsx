@@ -148,8 +148,11 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
         providerId: 'doubao',
         credentials: { apiKey, resourceId },
       })
+      // 与 settings 端对齐：先把 success / failure 结果计算好，但在保存成功之前
+      // 不调 setTestOk / setTestMsg，避免「连接成功」短暂闪一下又被 save fail 覆盖
+      // 的视觉抖动；同时让"展示成功 = 已落盘"成结构性不变量。
       if (res.ok) {
-        // 保存 —— safeStorage 不可用时 main 端拒绝写入，需把失败反映到 UI 上，
+        // safeStorage 不可用时 main 端拒绝写入，需把失败反映到 UI 上，
         // 否则用户点了"已连接"但密钥根本没落盘，下一次启动直接进不了 ASR。
         const saveRes = await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, {
           providerId: 'doubao',
@@ -167,9 +170,12 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
             doubao: { ...(cfg.providers['doubao'] ?? {}), resourceId },
           },
         })
+        setTestOk(true)
+        setTestMsg(`连接成功 · ${res.latencyMs ?? 0}ms`)
+      } else {
+        setTestOk(false)
+        setTestMsg(res.error ?? 'unknown error')
       }
-      setTestOk(res.ok)
-      setTestMsg(res.ok ? `连接成功 · ${res.latencyMs ?? 0}ms` : (res.error ?? 'unknown error'))
     } catch (err) {
       setTestOk(false)
       setTestMsg(err instanceof Error ? err.message : String(err))
