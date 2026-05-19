@@ -559,10 +559,10 @@ function LogsPane({ config, updateConfig }: LogsPaneProps): React.ReactElement {
           <div className="row">
             <div className="row-info">
               <span className="row-label" title={t('settings.logs.verboseHint')}>
-                详细日志
+                {t('settings.logs.verbose')}
               </span>
               <span className="row-hint" style={{ color: 'var(--warn)' }}>
-                ⚠ 会包含转录文本以便 debug —— 仅在复现问题时开启。
+                {t('settings.logs.verboseWarn')}
               </span>
               <span className="row-hint">{t('settings.logs.verboseHint')}</span>
             </div>

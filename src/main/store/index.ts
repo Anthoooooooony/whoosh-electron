@@ -88,6 +88,16 @@ export function getConfig(): AppConfig {
   return DEFAULT_CONFIG
 }
 
+/**
+ * 热路径专用：读 logging.verbose 时跳过整 schema 的 zod safeParse 开销。
+ * partial 帧 5-10 次/秒 调用 debugTranscript，全 schema 校验在此场景下过重。
+ * electron-store 的 dot-notation get 直接拿持久化 raw 值；缺失或非布尔时回落到 false。
+ * 不做模块级缓存，让 toggle 切换立刻生效，与 setConfig 写入语义一致。
+ */
+export function isVerboseLoggingEnabled(): boolean {
+  return store().get('config.logging.verbose', false) === true
+}
+
 export function setConfig(patch: AppConfigPatch): AppConfig {
   const current = getConfig()
   // 显式按 key 合并，避免 spread 把 undefined 字段污染回 current（exactOptionalPropertyTypes）

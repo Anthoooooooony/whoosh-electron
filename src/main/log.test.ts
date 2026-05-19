@@ -1,39 +1,27 @@
 // debugTranscript 测试 —— 守住「verbose=false 时零 console 输出」的隐私底线
 //
-// 通过 vi.mock 替换 ./store/index.js 的 getConfig 实现，避免触达真实 electron-store。
+// 通过 vi.mock 替换 ./store/index.js 的 isVerboseLoggingEnabled 实现，避免触达真实 electron-store。
+// 该入口跳过整 schema 的 zod safeParse 开销，是热路径专用读取。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AppConfig } from '@shared/ipc/schemas.js'
 
-const getConfigMock = vi.fn<() => AppConfig>()
+const isVerboseMock = vi.fn<() => boolean>()
 
 vi.mock('./store/index.js', () => ({
-  getConfig: (): AppConfig => getConfigMock(),
+  isVerboseLoggingEnabled: (): boolean => isVerboseMock(),
 }))
-
-function makeConfig(verbose: boolean): AppConfig {
-  return {
-    audio: { inputDeviceId: null },
-    providers: {},
-    currentProviderId: 'doubao',
-    behavior: { showHudWhenRecording: true, openAtLogin: false },
-    logging: { verbose },
-    ui: { locale: 'zh-CN' },
-    onboarding: { completedSteps: [], done: false },
-  }
-}
 
 describe('debugTranscript', () => {
   beforeEach(() => {
     vi.resetModules()
-    getConfigMock.mockReset()
+    isVerboseMock.mockReset()
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it('verbose=false → no-op；console.debug 不被调用', async () => {
-    getConfigMock.mockReturnValue(makeConfig(false))
+    isVerboseMock.mockReturnValue(false)
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const { debugTranscript } = await import('./log.js')
 
@@ -44,7 +32,7 @@ describe('debugTranscript', () => {
   })
 
   it('verbose=true → 真写 console.debug，带 label + fields', async () => {
-    getConfigMock.mockReturnValue(makeConfig(true))
+    isVerboseMock.mockReturnValue(true)
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const { debugTranscript } = await import('./log.js')
 
@@ -59,11 +47,11 @@ describe('debugTranscript', () => {
     })
   })
 
-  it('toggle 后续切换立即生效（每次调 getConfig，不缓存）', async () => {
+  it('toggle 后续切换立即生效（每次调 isVerboseLoggingEnabled，不缓存）', async () => {
     // 起始 off → 切到 on → 再切回 off；同一个 debugTranscript 引用三次调用的行为必须严格跟随 store
-    getConfigMock.mockReturnValueOnce(makeConfig(false))
-    getConfigMock.mockReturnValueOnce(makeConfig(true))
-    getConfigMock.mockReturnValueOnce(makeConfig(false))
+    isVerboseMock.mockReturnValueOnce(false)
+    isVerboseMock.mockReturnValueOnce(true)
+    isVerboseMock.mockReturnValueOnce(false)
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const { debugTranscript } = await import('./log.js')
 
