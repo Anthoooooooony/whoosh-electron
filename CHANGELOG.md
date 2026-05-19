@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.3.2...v0.3.3) (2026-05-19)
+
+
+### Bug Fixes
+
+* **build:** enable ad-hoc signing for macOS arm64 builds ([6d135a7](https://github.com/Anthoooooooony/whoosh-electron/commit/6d135a7ebfedb61fa4c726271ee28acb01801d47))
+* **build:** enable ad-hoc signing for macOS arm64 builds ([79f9c4f](https://github.com/Anthoooooooony/whoosh-electron/commit/79f9c4f22a6fa943895a2a53705c9338ad22a828))
+
 ## [0.3.2](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.3.1...v0.3.2) (2026-05-19)
 
 
