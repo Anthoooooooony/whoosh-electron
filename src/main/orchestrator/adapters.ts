@@ -34,6 +34,9 @@ export function createHudAdapter(getAppWindows: () => AppWindows | null): HudPor
       hudWc()?.send(Channels.SESSION_ERROR, {
         code: mapErrorCode(err.code),
         message: err.message,
+        // i18nKey 由 orchestrator 的「未配置 provider」分支注入；provider 自身抛错通常不带，
+        // 此时 HUD 降级到 message。exactOptionalPropertyTypes 下需展开后只在有值时挂上
+        ...(err.i18nKey !== undefined ? { i18nKey: err.i18nKey } : {}),
       }),
     showWindow: () => showHudOnActiveScreen(),
     hideWindow: () => hideHudWindow(),

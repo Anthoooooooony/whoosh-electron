@@ -152,5 +152,11 @@
     "DURATION_TOO_SHORT": "Recording too short",
     "UNKNOWN": "Unknown error",
     "safeStorageUnavailable": "System keychain unavailable; cannot securely save API key. Verify macOS Keychain / Windows DPAPI is accessible and retry."
+  },
+  "provider": {
+    "missingCredentials": {
+      "doubao": "Doubao credentials not configured (set them in Settings or via .env DOUBAO_API_KEY)",
+      "unknown": "Current provider is not registered; check Settings"
+    }
   }
 }

@@ -71,9 +71,19 @@ describe('IPC schemas', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects unknown provider', () => {
+    // providerId 在 schema 层退化为不透明 string；未知 id 的拒绝迁到了 IPC handler
+    // 通过 providerRegistry lookup 完成（见 main/providers/registry.test.ts）。
+    it('accepts arbitrary providerId string (gating moved to registry lookup)', () => {
       const result = SettingsSetApikeySchema.safeParse({
         providerId: 'whisper',
+        key: 'xxx',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects empty providerId', () => {
+      const result = SettingsSetApikeySchema.safeParse({
+        providerId: '',
         key: 'xxx',
       })
       expect(result.success).toBe(false)

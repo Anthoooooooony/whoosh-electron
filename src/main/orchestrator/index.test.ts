@@ -57,16 +57,35 @@ function makeAudio(): AudioRendererPort {
   return { start: vi.fn(), stop: vi.fn(), abort: vi.fn() }
 }
 
-function setup(opts: { provider?: ASRProvider | null } = {}) {
+function setup(opts: { provider?: ASRProvider | null; missingCredentialsKey?: string } = {}) {
   const provider = opts.provider === undefined ? new FakeProvider() : opts.provider
   const hud = makeHud()
   const audio = makeAudio()
   const paste = vi.fn()
   const notifyHotkeyDone = vi.fn()
   const getProvider = vi.fn((): ASRProvider | null => provider)
-  const deps: OrchestratorDeps = { getProvider, hud, audio, paste, notifyHotkeyDone }
+  const getMissingCredentialsKey = vi.fn(
+    (): string => opts.missingCredentialsKey ?? 'provider.missingCredentials.test',
+  )
+  const deps: OrchestratorDeps = {
+    getProvider,
+    getMissingCredentialsKey,
+    hud,
+    audio,
+    paste,
+    notifyHotkeyDone,
+  }
   const orch = new SessionOrchestrator(deps)
-  return { orch, provider, hud, audio, paste, notifyHotkeyDone, getProvider }
+  return {
+    orch,
+    provider,
+    hud,
+    audio,
+    paste,
+    notifyHotkeyDone,
+    getProvider,
+    getMissingCredentialsKey,
+  }
 }
 
 /** 冲洗 microtask 队列（fake timer 不影响 promise，故此法仍有效） */
@@ -178,6 +197,17 @@ describe('SessionOrchestrator', () => {
       expect(orch.getState()).toBe('error')
       expect(hud.error).toHaveBeenCalledWith(expect.objectContaining({ code: 'AUTH' }))
       expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+    })
+
+    it('错误对象携带 deps.getMissingCredentialsKey() 给出的 i18nKey', () => {
+      const { orch, hud } = setup({
+        provider: null,
+        missingCredentialsKey: 'provider.missingCredentials.doubao',
+      })
+      orch.handleHotkeyAction('START_RECORDING')
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'provider.missingCredentials.doubao' }),
+      )
     })
   })
 

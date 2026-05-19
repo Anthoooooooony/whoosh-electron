@@ -152,5 +152,11 @@
     "DURATION_TOO_SHORT": "录音太短",
     "UNKNOWN": "未知错误",
     "safeStorageUnavailable": "系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）"
+  },
+  "provider": {
+    "missingCredentials": {
+      "doubao": "尚未配置豆包凭据（请在 Settings 填写或设置 .env DOUBAO_API_KEY）",
+      "unknown": "当前 provider 未注册，请检查设置"
+    }
   }
 }

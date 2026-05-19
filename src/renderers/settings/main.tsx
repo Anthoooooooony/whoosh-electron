@@ -11,9 +11,22 @@ import { Channels } from '@shared/ipc/channels.js'
 import type { AppConfig } from '@shared/ipc/schemas.js'
 import { initI18n } from '@shared/i18n/index.js'
 import { triggerKeyLabel } from '@shared/trigger-key.js'
+import {
+  DoubaoStoreConfigSchema,
+  type DoubaoStoreConfig,
+} from '@shared/types/providers/doubao-config.js'
 import { useAudioInputDevices, type DeviceInfo } from '../_shared/use-audio-devices.js'
 
 initI18n()
+
+/**
+ * 把 `cfg.providers['doubao']`（record<string, unknown>）safeParse 成强类型子配置。
+ * 替代过去散落的 `as string` 断言 —— schema 在 shared 端是单一来源。
+ */
+function readDoubaoCfg(cfg: AppConfig): DoubaoStoreConfig {
+  const parsed = DoubaoStoreConfigSchema.safeParse(cfg.providers['doubao'] ?? {})
+  return parsed.success ? parsed.data : {}
+}
 
 type SectionKey = 'setup' | 'provider' | 'behavior' | 'logs' | 'about'
 
@@ -128,7 +141,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
   const { config, devices, apiKey, onApiKeyChange, updateConfig, refreshDevices } = props
   const { t } = useTranslation()
   const [resourceId, setResourceId] = useState<string>(
-    (config.providers['doubao']?.['resourceId'] as string) ?? 'volc.seedasr.sauc.duration',
+    readDoubaoCfg(config).resourceId ?? 'volc.seedasr.sauc.duration',
   )
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{
@@ -315,12 +328,15 @@ function ProviderPane({
   providerCfg,
   updateProviderConfig,
 }: ProviderPaneProps): React.ReactElement {
-  const language = (providerCfg['language'] as string) ?? 'zh-CN'
-  const endpointKey = (providerCfg['endpointKey'] as string) ?? 'bigmodel_async'
-  const enableItn = providerCfg['enable_itn'] !== false
-  const enablePunc = providerCfg['enable_punc'] !== false
-  const enableDdc = providerCfg['enable_ddc'] === true
-  const showUtterances = providerCfg['show_utterances'] === true
+  // safeParse 落到强类型，避免散点 `as string` —— 字段缺省值与之前等价
+  const parsed = DoubaoStoreConfigSchema.safeParse(providerCfg)
+  const doubaoCfg: DoubaoStoreConfig = parsed.success ? parsed.data : {}
+  const language = doubaoCfg.language ?? 'zh-CN'
+  const endpointKey = doubaoCfg.endpointKey ?? 'bigmodel_async'
+  const enableItn = doubaoCfg.enable_itn !== false
+  const enablePunc = doubaoCfg.enable_punc !== false
+  const enableDdc = doubaoCfg.enable_ddc === true
+  const showUtterances = doubaoCfg.show_utterances === true
 
   return (
     <>

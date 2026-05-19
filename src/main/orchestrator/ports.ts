@@ -36,6 +36,12 @@ export interface AudioRendererPort {
 export interface OrchestratorDeps {
   /** 拉取当前配好的 ASR provider；null = 未配置（onboarding 未完成或凭据缺失） */
   getProvider(): ASRProvider | null
+  /**
+   * 当 getProvider 返 null 时，orchestrator 拿这个 i18n key 透给 HUD。
+   * 由 main/index.ts 从 registry 解析当前 providerId 的 missingCredentialsKey；
+   * provider 未注册 / store 损坏时回退到通用 key。返回 key（非文案）。
+   */
+  getMissingCredentialsKey(): string
   hud: HudPort
   audio: AudioRendererPort
   /** 把 final 文本注入当前焦点 app */

@@ -29,6 +29,12 @@ export interface ASRError {
   retryable: boolean
   /** 服务端原始错误码（豆包：20000000 / 45000001 / 等） */
   serverCode?: number
+  /**
+   * i18n key（不是文案）—— renderer 收到 SESSION_ERROR 后优先 t(i18nKey) 渲染，
+   * 缺省则降级到 message。orchestrator 用它把「未配置 provider」类的
+   * registry.missingCredentialsKey 透传到 HUD，避免在 main 接入 i18next。
+   */
+  i18nKey?: string
 }
 
 /**
