@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.2](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.3.1...v0.3.2) (2026-05-19)
+
+
+### Bug Fixes
+
+* **ci:** expand check matrix to macOS and Windows runners ([5aa72ee](https://github.com/Anthoooooooony/whoosh-electron/commit/5aa72eef47fc28626bc975c3d1013dc9de8170b3))
+* **ci:** 扩展 check job 到 macOS 和 Windows matrix 以在 PR 阶段暴露平台特定问题 ([0f35660](https://github.com/Anthoooooooony/whoosh-electron/commit/0f35660e5fc74e7ccd76d1a4913d3587ef2d158a))
+* **test:** add vitest coverage baseline via v8 provider ([3713ffc](https://github.com/Anthoooooooony/whoosh-electron/commit/3713ffc28badb2722b9cdbdb01f9b0c2e5b3de7c))
+* **test:** add vitest coverage baseline via v8 provider ([050d27c](https://github.com/Anthoooooooony/whoosh-electron/commit/050d27c272eba77557e1ce2948a59f4cdafd782f))
+* **test:** scaffold renderer test infra with smoke tests ([d291b36](https://github.com/Anthoooooooony/whoosh-electron/commit/d291b3695d8d180957e7918f3eae52eb6841ce3a))
+* **test:** scaffold renderer test infra with smoke tests ([a4ce30a](https://github.com/Anthoooooooony/whoosh-electron/commit/a4ce30a31ccdb9d7c53fbfa7306b4f6cc72f2ae4))
+* **ui:** split safeStorage error message by reason ([#69](https://github.com/Anthoooooooony/whoosh-electron/issues/69)) ([0ee6292](https://github.com/Anthoooooooony/whoosh-electron/commit/0ee629211d10d5a017177a7fe1c34bd3c26c1f1a))
+* **ui:** split safeStorage error message by reason ([#69](https://github.com/Anthoooooooony/whoosh-electron/issues/69)) ([4ce8c92](https://github.com/Anthoooooooony/whoosh-electron/commit/4ce8c92d9e9bae2f5476157cd507dc9e2fbfb682))
+
 ## [0.3.1](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.3.0...v0.3.1) (2026-05-19)
 
 
