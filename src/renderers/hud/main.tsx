@@ -24,7 +24,7 @@ function formatTimer(elapsedMs: number): string {
   return `${mm}:${ss}`
 }
 
-function App(): React.ReactElement | null {
+export function App(): React.ReactElement | null {
   const { t } = useTranslation()
   const [state, setState] = useState<ServerState>('hidden')
   const [hover, setHover] = useState(false)

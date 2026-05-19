@@ -30,7 +30,7 @@ function readDoubaoCfg(cfg: AppConfig): DoubaoStoreConfig {
 
 type SectionKey = 'setup' | 'provider' | 'behavior' | 'logs' | 'about'
 
-function App(): React.ReactElement {
+export function App(): React.ReactElement {
   const [section, setSection] = useState<SectionKey>('setup')
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [apiKey, setApiKeyState] = useState<string>('')
