@@ -103,7 +103,7 @@
           "arch": "arm64"
         }
       ],
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extendInfo": {
