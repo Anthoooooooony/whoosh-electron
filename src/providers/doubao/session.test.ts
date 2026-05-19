@@ -30,8 +30,16 @@ async function startMockServer(): Promise<{
   }
 }
 
-/** 用最小脚本回握手 ack，让 session 进入 'ready' 态 */
-function attachHandshakeAck(server: WebSocketServer): void {
+/**
+ * 用最小脚本回握手 ack，让 session 进入 'ready' 态。
+ * 可选 onAudioFrame 用于在同一个 connection handler 里追加测试自定义行为
+ * （比如收到 last 帧后回 final），避免叠加 server.on('connection', ...) 让阅读
+ * 时找不到哪个 handler 在跑。
+ */
+function attachHandshakeAck(
+  server: WebSocketServer,
+  onAudioFrame?: (ws: WSServerSocket, frame: ReturnType<typeof decodeFrame>) => void,
+): void {
   server.on('connection', (ws: WSServerSocket) => {
     ws.on('message', (data) => {
       const buf = data instanceof Buffer ? data : Buffer.from(data as ArrayBuffer)
@@ -45,7 +53,9 @@ function attachHandshakeAck(server: WebSocketServer): void {
             json: { result: { text: '' } },
           }),
         )
+        return
       }
+      onAudioFrame?.(ws, frame)
     })
   })
 }
@@ -96,26 +106,21 @@ describe('DoubaoSession.finish() 状态守卫', () => {
   })
 
   it('finish() 后再次 finish() 抛错（状态已是 closed）', async () => {
-    attachHandshakeAck(mock.server)
-    // 让服务端在收到 last 帧后回一帧 final，使第一次 finish() 正常 resolve
-    mock.server.on('connection', (ws: WSServerSocket) => {
-      ws.on('message', (data) => {
-        const buf = data instanceof Buffer ? data : Buffer.from(data as ArrayBuffer)
-        const frame = decodeFrame(buf)
-        if (frame.header.messageType === MessageType.AUDIO_ONLY_REQUEST) {
-          const isLast = (frame.header.flags & 0b0010) !== 0
-          if (isLast) {
-            ws.send(
-              encodeControlFrame({
-                messageType: MessageType.FULL_SERVER_RESPONSE,
-                flags: Flags.NEG_WITH_SEQUENCE,
-                sequenceNumber: 99,
-                json: { result: { text: '你好' } },
-              }),
-            )
-          }
-        }
-      })
+    // 让服务端在收到 last 帧后回一帧 final，使第一次 finish() 正常 resolve。
+    // 用 attachHandshakeAck 的 onAudioFrame 回调而非另开 server.on('connection')，
+    // 单个 handler 即可看完整脚本，不必跨多个 listener 拼出运行轨迹。
+    attachHandshakeAck(mock.server, (ws, frame) => {
+      if (frame.header.messageType !== MessageType.AUDIO_ONLY_REQUEST) return
+      const isLast = (frame.header.flags & 0b0010) !== 0
+      if (!isLast) return
+      ws.send(
+        encodeControlFrame({
+          messageType: MessageType.FULL_SERVER_RESPONSE,
+          flags: Flags.NEG_WITH_SEQUENCE,
+          sequenceNumber: 99,
+          json: { result: { text: '你好' } },
+        }),
+      )
     })
 
     const session = new DoubaoSession({
@@ -128,6 +133,29 @@ describe('DoubaoSession.finish() 状态守卫', () => {
     expect(session.getState()).toBe('closed')
 
     await expect(session.finish()).rejects.toThrow(/session-not-streaming/)
+  })
+
+  // state 仍是 ready/streaming 但底层 ws.readyState 已不在 OPEN —— finish() 需抛
+  // 'session-ws-closed' 而非 'session-not-streaming'，让上层 orchestrator 可以按
+  // IO 错语义处理（vs FSM bug）。直接操纵 session 内部 ws 句柄构造这个 corner。
+  it('state 仍合法但底层 ws 已断时 finish() 抛 session-ws-closed', async () => {
+    attachHandshakeAck(mock.server)
+    const session = new DoubaoSession({
+      auth: { mode: 'new', apiKey: 'k' },
+      endpointOverride: mock.url,
+    })
+    await session.start()
+    expect(session.getState()).toBe('ready')
+
+    // 不动 session.state，只把 ws.readyState 改成非 OPEN（这里塞 CLOSING）。
+    // 直接 stub readyState 避免触发真实 close 事件链。
+    const ws = (session as unknown as { ws: WebSocket }).ws
+    Object.defineProperty(ws, 'readyState', {
+      configurable: true,
+      get: () => WebSocket.CLOSING,
+    })
+
+    await expect(session.finish()).rejects.toThrow(/session-ws-closed/)
   })
 })
 

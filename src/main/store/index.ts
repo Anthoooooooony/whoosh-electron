@@ -63,7 +63,9 @@ function isEncryptedEntry(value: string): boolean {
   return value.startsWith(ENCRYPTED_PREFIX)
 }
 
-export type SetApiKeyResult = { ok: true } | { ok: false; reason: 'encryption-unavailable' }
+export type SetApiKeyResult =
+  | { ok: true }
+  | { ok: false; reason: 'encryption-unavailable' | 'encrypt-throw' }
 
 let storeInstance: ElectronStore<StoreSchema> | null = null
 
@@ -158,7 +160,17 @@ export function setApiKey(providerId: string, key: string): SetApiKeyResult {
     // 调用方负责把 reason 透给 UI 让用户处理（如装好 keyring 后重试）。
     return { ok: false, reason: 'encryption-unavailable' }
   }
-  apiKeys[providerId] = ENCRYPTED_PREFIX + safeStorage.encryptString(key).toString('base64')
+  // isEncryptionAvailable=true 但 encryptString 仍可能在边缘情况抛（如 Linux
+  // libsecret 启动竞争 / macOS keychain ACL 拒绝）。捕获后映射成 reason，避免
+  // 把异常冒泡穿透 IPC handler（zod 序列化不了 Error）。
+  let cipher: string
+  try {
+    cipher = ENCRYPTED_PREFIX + safeStorage.encryptString(key).toString('base64')
+  } catch (err) {
+    console.error('[store] safeStorage.encryptString threw', err)
+    return { ok: false, reason: 'encrypt-throw' }
+  }
+  apiKeys[providerId] = cipher
   store().set('apiKeys', apiKeys)
   return { ok: true }
 }

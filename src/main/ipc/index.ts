@@ -144,7 +144,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     const cfg = deps.getConfig()
     const completed = new Set(cfg.onboarding.completedSteps)
     // 决定从哪一步开始：找到第一个未完成的步骤
-    const platform = process.platform as 'darwin' | 'win32' | 'linux'
+    const platform: 'darwin' | 'win32' = process.platform === 'darwin' ? 'darwin' : 'win32'
     const allSteps: (1 | 2 | 3 | 4)[] = platform === 'darwin' ? [1, 2, 3, 4] : [1, 2, 4]
     const next = allSteps.find((s) => !completed.has(`step${s}`))
     return { step: (next ?? 4) as 1 | 2 | 3 | 4, platform }
@@ -154,7 +154,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     const cfg = deps.getConfig()
     const completed = Array.from(new Set([...cfg.onboarding.completedSteps, `step${req.step}`]))
     deps.setConfig({ onboarding: { completedSteps: completed, done: cfg.onboarding.done } })
-    const platform = process.platform as 'darwin' | 'win32' | 'linux'
+    const platform: 'darwin' | 'win32' = process.platform === 'darwin' ? 'darwin' : 'win32'
     const allSteps: (1 | 2 | 3 | 4)[] = platform === 'darwin' ? [1, 2, 3, 4] : [1, 2, 4]
     const nextStep = allSteps.find((s) => !completed.includes(`step${s}`))
     return { nextStep: (nextStep ?? null) as 1 | 2 | 3 | 4 | null }

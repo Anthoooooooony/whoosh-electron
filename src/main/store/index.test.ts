@@ -86,6 +86,20 @@ describe('store · api key persistence (#51)', () => {
       )
     })
 
+    it('isEncryptionAvailable=true 但 encryptString 抛 → 返回 encrypt-throw 而非冒泡', () => {
+      // safeStorage 可用性自检通过但实际调用挂掉的边缘情况
+      // （Linux libsecret 启动竞争 / macOS keychain ACL 拒绝等）
+      safeStorageMock.encryptString.mockImplementationOnce(() => {
+        throw new Error('keychain temporarily unavailable')
+      })
+
+      const result = setApiKey('doubao', 'secret-uuid')
+      expect(result).toEqual({ ok: false, reason: 'encrypt-throw' })
+
+      const stored = (memory.data.get('apiKeys') as Record<string, string> | undefined)?.['doubao']
+      expect(stored).toBeUndefined()
+    })
+
     it('空 key 即使 safeStorage 不可用也允许（视作删除）', () => {
       memory.data.set('apiKeys', { doubao: `${ENCRYPTED_PREFIX}xxx` })
       safeStorageMock.isEncryptionAvailable.mockReturnValue(false)

@@ -6,7 +6,8 @@ import { z } from 'zod'
 // ───────────────────────────────────────────
 // 基础类型
 // ───────────────────────────────────────────
-export const PlatformSchema = z.enum(['darwin', 'win32', 'linux'])
+// 仅 macOS + Windows；详见 src/shared/trigger-key.ts 的注释。
+export const PlatformSchema = z.enum(['darwin', 'win32'])
 export const HudStateSchema = z.enum(['recording', 'hover', 'processing', 'error'])
 export const ErrorCodeSchema = z.enum([
   'NETWORK_ERROR',
@@ -118,9 +119,14 @@ export const SettingsSetApikeySchema = z.object({
   key: z.string(),
 })
 // safeStorage 不可用时 main 端拒绝写入，renderer 据此弹错并保留输入内容。
+// 'encryption-unavailable'：safeStorage.isEncryptionAvailable() 为 false
+// 'encrypt-throw'：可用性 OK 但实际 encryptString 调用抛异常（边缘情况）
 export const SettingsSetApikeyResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true) }),
-  z.object({ ok: z.literal(false), reason: z.enum(['encryption-unavailable']) }),
+  z.object({
+    ok: z.literal(false),
+    reason: z.enum(['encryption-unavailable', 'encrypt-throw']),
+  }),
 ])
 
 // ───────────────────────────────────────────
