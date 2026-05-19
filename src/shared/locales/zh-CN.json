@@ -153,6 +153,7 @@
     "DURATION_TOO_SHORT": "录音太短",
     "UNKNOWN": "未知错误",
     "safeStorageUnavailable": "系统密钥环不可用，无法安全保存 API Key（请确认 macOS 钥匙串 / Windows DPAPI 可访问后重试）",
+    "encryptThrow": "保存 API Key 时加密失败 —— 系统密钥环报错，可能是 macOS 钥匙串临时不可访问，请重试或重启 app",
     "pasteFailed": "粘贴失败，请重试或检查应用权限",
     "pasteAddonUnavailable": "原生粘贴组件未安装，识别文本未注入到当前应用",
     "micPermissionLost": "麦克风权限已被撤销或设备被占用，录音已中断"
