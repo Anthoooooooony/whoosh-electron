@@ -17,7 +17,7 @@
 import type { ASRError, ASRProvider } from '@shared/types/provider.js'
 import type { HotkeyAction } from '../hotkey/fsm.js'
 import { debugTranscript } from '../log.js'
-import type { OrchestratorDeps } from './ports.js'
+import type { OrchestratorDeps, PasteResult } from './ports.js'
 
 type State = 'idle' | 'recording' | 'processing' | 'pasting' | 'error'
 
@@ -183,15 +183,66 @@ export class SessionOrchestrator {
     debugTranscript('final', { text, durationMs })
     this.deps.hud.final(text, durationMs)
 
+    // paste 失败两种语义：
+    //   - addon-unavailable: prebuild .node 缺失（CI 漏出 / 安装包损坏）
+    //   - paste-failed:      addon 加载到但 OS-level 调用抛错（罕见，如 a11y 权限丢失）
+    // 任一失败都要 surfaceError，不再 console.warn 静默丢字（issue #60）。
+    // 失败时不走「set state idle + notifyHotkeyDone」尾巴，由 surfaceError 接管。
+    let pasteResult: PasteResult
     try {
-      this.deps.paste(text)
+      pasteResult = this.deps.paste(text)
     } catch (err) {
-      console.warn('[orchestrator] paste failed:', err)
+      // paste port 实现里抛了异常（adapter 自身 bug），归到 paste-failed 分支
+      pasteResult = {
+        ok: false,
+        reason: 'paste-failed',
+        detail: err instanceof Error ? err.message : String(err),
+      }
+    }
+
+    if (!pasteResult.ok) {
+      const i18nKey =
+        pasteResult.reason === 'addon-unavailable'
+          ? 'errors.pasteAddonUnavailable'
+          : 'errors.pasteFailed'
+      this.surfaceError({
+        code: 'UNKNOWN',
+        message: pasteResult.detail,
+        retryable: false,
+        i18nKey,
+      })
+      this.provider = null
+      this.deps.notifyHotkeyDone()
+      return
     }
 
     this.hideHud()
     this.provider = null
     this.state = 'idle'
+    this.deps.notifyHotkeyDone()
+  }
+
+  /**
+   * 由 audio renderer 上报「采集异常终止」时调（issue #60 W4-P1-2）。
+   * 触发条件：MediaStreamTrack 在录音中 onended（用户在系统设置里撤销麦克风权限 /
+   * 设备被拔出 / OS 强占）。把它翻译成 SESSION_ERROR，让 HUD 给用户反馈，
+   * 而不是默默继续推 0 字节音频导致 session 末端没文本。
+   */
+  handleAudioCaptureEnded(reason: 'mic-lost'): void {
+    // 不在 recording / processing 态时忽略：可能是 abort 之后才到的 stale 信号
+    if (this.state !== 'recording' && this.state !== 'processing') return
+    // 主动 abort 路径走 abortSession，不应被错误地标成 mic-lost
+    if (this.cancelled) return
+
+    this.provider?.abort()
+    this.provider = null
+    // 目前 reason 只有 'mic-lost' 一种；新增 reason 时在这里加 i18nKey 分支
+    this.surfaceError({
+      code: 'UNKNOWN',
+      message: `audio capture ended unexpectedly: ${reason}`,
+      retryable: false,
+      i18nKey: 'errors.micPermissionLost',
+    })
     this.deps.notifyHotkeyDone()
   }
 

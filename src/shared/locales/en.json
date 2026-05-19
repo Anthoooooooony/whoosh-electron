@@ -152,7 +152,10 @@
     "MIC_PERMISSION": "Microphone permission denied",
     "DURATION_TOO_SHORT": "Recording too short",
     "UNKNOWN": "Unknown error",
-    "safeStorageUnavailable": "System keychain unavailable; cannot securely save API key. Verify macOS Keychain / Windows DPAPI is accessible and retry."
+    "safeStorageUnavailable": "System keychain unavailable; cannot securely save API key. Verify macOS Keychain / Windows DPAPI is accessible and retry.",
+    "pasteFailed": "Paste failed; try again or check application permissions",
+    "pasteAddonUnavailable": "Native paste component is missing; recognized text was not injected into the focused app",
+    "micPermissionLost": "Microphone permission was revoked or the device was taken over; recording was aborted"
   },
   "provider": {
     "missingCredentials": {

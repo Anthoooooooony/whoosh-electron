@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AudioCaptureEndedSchema,
   AudioChunkSchema,
   HudStateSchema,
   OnboardingGetStepResponseSchema,
@@ -33,6 +34,20 @@ describe('IPC schemas', () => {
         timestamp: -1,
       })
       expect(result.success).toBe(false)
+    })
+  })
+
+  describe('AudioCaptureEndedSchema', () => {
+    it('accepts { reason: "mic-lost" }', () => {
+      expect(AudioCaptureEndedSchema.safeParse({ reason: 'mic-lost' }).success).toBe(true)
+    })
+
+    it('rejects unknown reason', () => {
+      expect(AudioCaptureEndedSchema.safeParse({ reason: 'whatever' }).success).toBe(false)
+    })
+
+    it('rejects missing reason', () => {
+      expect(AudioCaptureEndedSchema.safeParse({}).success).toBe(false)
     })
   })
 

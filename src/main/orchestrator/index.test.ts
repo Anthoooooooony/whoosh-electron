@@ -22,7 +22,7 @@ vi.mock('../store/index.js', () => ({
 }))
 
 import { SessionOrchestrator } from './index.js'
-import type { AudioRendererPort, HudPort, OrchestratorDeps } from './ports.js'
+import type { AudioRendererPort, HudPort, OrchestratorDeps, PasteResult } from './ports.js'
 
 /** 可控的 fake provider：start/finish 默认立即 resolve；finish 可 arm 成 deferred */
 class FakeProvider extends EventEmitter implements ASRProvider {
@@ -74,11 +74,17 @@ function makeAudio(): AudioRendererPort {
   return { start: vi.fn(), stop: vi.fn(), abort: vi.fn() }
 }
 
-function setup(opts: { provider?: ASRProvider | null; missingCredentialsKey?: string } = {}) {
+function setup(
+  opts: {
+    provider?: ASRProvider | null
+    missingCredentialsKey?: string
+    paste?: (text: string) => PasteResult
+  } = {},
+) {
   const provider = opts.provider === undefined ? new FakeProvider() : opts.provider
   const hud = makeHud()
   const audio = makeAudio()
-  const paste = vi.fn()
+  const paste = vi.fn<(text: string) => PasteResult>(opts.paste ?? (() => ({ ok: true })))
   const notifyHotkeyDone = vi.fn()
   const getProvider = vi.fn((): ASRProvider | null => provider)
   const getMissingCredentialsKey = vi.fn(
@@ -276,6 +282,189 @@ describe('SessionOrchestrator', () => {
 
       // 2s linger 结束回 idle
       vi.advanceTimersByTime(2000)
+      expect(orch.getState()).toBe('idle')
+    })
+  })
+
+  // 对应 issue #60 W3-P1-1：native paste addon 失败不再静默丢字。
+  describe('paste 失败时 surface SESSION_ERROR（issue #60）', () => {
+    it('addon-unavailable → i18nKey=errors.pasteAddonUnavailable + 不回 idle 走 error linger', async () => {
+      const paste = vi.fn(
+        (): PasteResult => ({
+          ok: false,
+          reason: 'addon-unavailable',
+          detail: 'paste.node not found',
+        }),
+      )
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'hello world')
+      await tick()
+
+      expect(paste).toHaveBeenCalledWith('hello world')
+      // final 已经先推到 HUD，然后 surfaceError 把 state 翻成 error
+      expect(hud.final).toHaveBeenCalledWith('hello world', expect.any(Number))
+      expect(orch.getState()).toBe('error')
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteAddonUnavailable' }),
+      )
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(2000)
+      expect(orch.getState()).toBe('idle')
+    })
+
+    it('paste-failed (OS-level) → i18nKey=errors.pasteFailed', async () => {
+      const paste = vi.fn(
+        (): PasteResult => ({ ok: false, reason: 'paste-failed', detail: 'a11y revoked' }),
+      )
+      const { orch, provider, hud } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'text')
+      await tick()
+
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteFailed' }),
+      )
+      expect(orch.getState()).toBe('error')
+    })
+
+    it('paste 实现里直接抛异常 → 降级到 paste-failed 分支', async () => {
+      const paste = vi.fn((): PasteResult => {
+        throw new Error('adapter bug')
+      })
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'text')
+      await tick()
+
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.pasteFailed', message: 'adapter bug' }),
+      )
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // 对应 issue #60 W4-P1-2：麦克风权限被吊销 / 设备被抢占时，
+  // audio renderer 通过 AUDIO_CAPTURE_ENDED 触发 handleAudioCaptureEnded。
+  describe('handleAudioCaptureEnded（issue #60）', () => {
+    it('recording 态 mic-lost → surface i18nKey=errors.micPermissionLost，provider abort', async () => {
+      const { orch, provider, hud, notifyHotkeyDone } = setup()
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      expect(orch.getState()).toBe('recording')
+
+      orch.handleAudioCaptureEnded('mic-lost')
+
+      expect(fake.abort).toHaveBeenCalledTimes(1)
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.micPermissionLost' }),
+      )
+      expect(orch.getState()).toBe('error')
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+    })
+
+    it('用户主动 abort 后到来的 stale capture-ended → 抑制，不刷错', async () => {
+      const { orch, hud, notifyHotkeyDone } = setup()
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('ABORT_CANCEL')
+      const notifyCallsAfterAbort = notifyHotkeyDone.mock.calls.length
+      const errorCallsAfterAbort = vi.mocked(hud.error).mock.calls.length
+
+      orch.handleAudioCaptureEnded('mic-lost')
+
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(notifyCallsAfterAbort)
+      expect(hud.error).toHaveBeenCalledTimes(errorCallsAfterAbort)
+    })
+
+    it('idle 态收到 stale capture-ended → no-op', () => {
+      const { orch, hud, notifyHotkeyDone } = setup()
+      orch.handleAudioCaptureEnded('mic-lost')
+      expect(hud.error).not.toHaveBeenCalled()
+      expect(notifyHotkeyDone).not.toHaveBeenCalled()
+      expect(orch.getState()).toBe('idle')
+    })
+
+    it('processing 态 mic-lost 也会 surface（兜底）', async () => {
+      const { orch, provider, hud } = setup()
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      expect(orch.getState()).toBe('processing')
+
+      orch.handleAudioCaptureEnded('mic-lost')
+      expect((provider as FakeProvider).abort).toHaveBeenCalled()
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ i18nKey: 'errors.micPermissionLost' }),
+      )
+    })
+
+    // pasting 态不在 handleAudioCaptureEnded 的合法集合内（state 守卫只允许
+    // recording / processing），但 paste → final → idle 中间这个窗口
+    // 仍可能收到迟到的 stale 信号。显式断言守卫行为，防止未来改动把它放穿。
+    it('pasting 态收到 stale capture-ended → no-op', async () => {
+      // 用 paste 钩子在 onProviderFinal 调到 deps.paste() 的瞬间触发
+      // handleAudioCaptureEnded —— 此时 state 已经是 'pasting'。
+      const observed = {
+        stateDuringPaste: null as string | null,
+        notifyCallsAtPasteEntry: -1,
+        errorCallsAtPasteEntry: -1,
+      }
+      // 用 object holder 暴露闭包变量，避开 prefer-const 与 paste 必须先于 setup() 定义的矛盾
+      const refs: {
+        orch: SessionOrchestrator | null
+        hud: HudPort | null
+        notify: ReturnType<typeof vi.fn> | null
+      } = { orch: null, hud: null, notify: null }
+      const paste = vi.fn((): PasteResult => {
+        const { orch: o, hud: h, notify: n } = refs
+        if (o === null || h === null || n === null) throw new Error('refs not wired')
+        observed.stateDuringPaste = o.getState()
+        observed.notifyCallsAtPasteEntry = n.mock.calls.length
+        observed.errorCallsAtPasteEntry = vi.mocked(h.error).mock.calls.length
+        o.handleAudioCaptureEnded('mic-lost')
+        return { ok: true }
+      })
+
+      const { orch, provider, hud, notifyHotkeyDone } = setup({ paste })
+      refs.orch = orch
+      refs.hud = hud
+      refs.notify = notifyHotkeyDone
+      const fake = provider as FakeProvider
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      await tick()
+      fake.emit('final', 'hello')
+      await tick()
+
+      // 确认我们确实是在 pasting 态触发的 handleAudioCaptureEnded
+      expect(observed.stateDuringPaste).toBe('pasting')
+      // pasting 不在合法集合内 → 守卫早返、不刷错、不重复 notify
+      expect(vi.mocked(hud.error).mock.calls.length).toBe(observed.errorCallsAtPasteEntry)
+      // paste 成功后的一次 notifyHotkeyDone 在 stale capture-ended 后才发生，
+      // 所以最终次数 = 进入 paste 时的次数 + 1（成功路径），而不是 +2
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(observed.notifyCallsAtPasteEntry + 1)
+      // paste 成功路径正常回到 idle，没有被 stale 信号污染
       expect(orch.getState()).toBe('idle')
     })
   })
