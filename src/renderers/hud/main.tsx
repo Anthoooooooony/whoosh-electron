@@ -46,6 +46,9 @@ function App(): React.ReactElement | null {
       if (normalized === 'recording') {
         setPartial('')
         setErrorMsg('')
+        // 与 offHide 路径对称：进入 recording 必须把错误两段（i18nKey + message）一起清，
+        // 否则上一轮残留的 errorI18nKey 会在下一次进入 error 态时短暂闪现旧文案
+        setErrorI18nKey('')
         setHover(false)
         recordStartRef.current = Date.now()
       }

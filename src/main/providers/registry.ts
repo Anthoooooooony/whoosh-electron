@@ -55,6 +55,12 @@ export interface ProviderEntry<TStoreCfg = unknown, TRuntimeCfg = unknown> {
  * 存储面用 any 擦掉两个泛型 —— 运行期把不同 provider 装一篮，
  * 调用方拿到 entry 后再回到自己的具体类型（在 entry 内部 factory/fromStore 仍 type-safe）。
  * 不用 `unknown` 是因为 factory 的 cfg 在参数位置是 contravariant，`unknown` 不收。
+ *
+ * 调用方契约（type system 表达不出来，写在这里）：
+ * 必须用「同一 entry 的 fromStore 输出」喂「同一 entry 的 factory」 ——
+ * 跨 entry 混搭（如 doubao.fromStore 的结果 → otherEntry.factory）即使能通过编译也会运行期炸。
+ * 生产路径里 main/index.ts 的 makeCurrentProvider 是唯一调用点，其 entry → fromStore → factory
+ * 是同一 entry 内闭合，没破契约的口子。
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyProviderEntry = ProviderEntry<any, any>

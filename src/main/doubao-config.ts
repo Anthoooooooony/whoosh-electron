@@ -43,7 +43,11 @@ function loadDotEnv(): Record<string, string> {
 }
 
 let envCache: Record<string, string> | null = null
-function getEnv(): Record<string, string> {
+/**
+ * 读取（并 memoize）`.env` 内容。export 是为了让 doubao registry-entry 的 fromStore
+ * 也能复用「env 优先于 store」的优先级 —— 旧 resolveDoubaoConfig 的语义在 registry 路径下不能丢。
+ */
+export function getEnv(): Record<string, string> {
   if (envCache === null) envCache = loadDotEnv()
   return envCache
 }

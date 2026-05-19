@@ -10,7 +10,12 @@
 //   放在同一目录里语义最紧凑。registry-entry 引用了 main 的 doubao-config（fromStore/testDoubaoConnection），
 //   两者都跑在 main 进程，不会被 renderer bundle 拉进去。
 
-import { fromStore as doubaoFromStore, testDoubaoConnection } from '@main/doubao-config.js'
+import {
+  fromEnv,
+  fromStore as doubaoFromStore,
+  getEnv,
+  testDoubaoConnection,
+} from '@main/doubao-config.js'
 import type { AppConfig } from '@shared/ipc/schemas.js'
 import {
   DoubaoStoreConfigSchema,
@@ -23,6 +28,10 @@ export const doubaoEntry: ProviderEntry<DoubaoStoreConfig, DoubaoProviderConfig>
   id: 'doubao',
   factory: (cfg) => new DoubaoProvider(cfg),
   fromStore: (store: AppConfig, apiKey: string | null) => {
+    // `.env`（dev override）优先于 store —— 与被替换的 resolveDoubaoConfig 保持同一优先级。
+    // 不走这一步的话，main/index.ts 启动时的「.env credentials loaded」日志会变成谎言。
+    const envConfig = fromEnv(getEnv())
+    if (envConfig) return envConfig
     // store.providers[id] 是 record；fromStore 内部已做字段白名单与类型 narrowing
     const raw = store.providers[doubaoEntry.id] ?? {}
     return doubaoFromStore(raw, apiKey)
