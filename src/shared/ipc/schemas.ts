@@ -119,9 +119,14 @@ export const SettingsSetApikeySchema = z.object({
   key: z.string(),
 })
 // safeStorage 不可用时 main 端拒绝写入，renderer 据此弹错并保留输入内容。
+// 'encryption-unavailable'：safeStorage.isEncryptionAvailable() 为 false
+// 'encrypt-throw'：可用性 OK 但实际 encryptString 调用抛异常（边缘情况）
 export const SettingsSetApikeyResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true) }),
-  z.object({ ok: z.literal(false), reason: z.enum(['encryption-unavailable']) }),
+  z.object({
+    ok: z.literal(false),
+    reason: z.enum(['encryption-unavailable', 'encrypt-throw']),
+  }),
 ])
 
 // ───────────────────────────────────────────

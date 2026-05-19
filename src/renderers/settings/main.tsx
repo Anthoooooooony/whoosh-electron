@@ -153,7 +153,7 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
   // 失败时把 reason 返回给调用方，让 testConnection 把测试结果覆盖成保存失败提示。
   // 不在这里 setTestResult —— 调用方还要根据成功 / 失败决定后续 resourceId 同步。
   const saveApiKey = useCallback(async (): Promise<
-    { ok: true } | { ok: false; reason: 'encryption-unavailable' }
+    { ok: true } | { ok: false; reason: 'encryption-unavailable' | 'encrypt-throw' }
   > => {
     const res = await window.ipc.invoke(Channels.SETTINGS_SET_APIKEY, {
       providerId: 'doubao',
