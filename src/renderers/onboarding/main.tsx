@@ -23,7 +23,7 @@ interface OnboardingState {
   platform: Platform
 }
 
-function App(): React.ReactElement {
+export function App(): React.ReactElement {
   const [state, setState] = useState<OnboardingState | null>(null)
 
   useEffect(() => {
