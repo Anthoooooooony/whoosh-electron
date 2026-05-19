@@ -14,9 +14,15 @@ concurrency:
 
 jobs:
   check:
-    name: typecheck · lint · test
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: typecheck · lint · test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      # 平台间互相独立暴露平台特定问题（hotkey rawcode、process.platform 分支、
+      # 剪贴板 ConcealedType 标记等），一边失败不应掩盖另一边的诊断信号。
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
