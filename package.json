@@ -42,7 +42,7 @@
     "electron-vite": "^5.0.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
-    "happy-dom": "^16.0.0",
+    "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "node-gyp": "^12.3.0",
