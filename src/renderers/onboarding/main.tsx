@@ -159,8 +159,14 @@ function Step1Credentials({ onComplete }: { onComplete: () => void }): React.Rea
           key: apiKey,
         })
         if (!saveRes.ok) {
+          // 按 reason narrow：'encryption-unavailable' = safeStorage 整体不可用；
+          // 'encrypt-throw' = 可用但 encryptString 抛错，文案需要分开提示。
           setTestOk(false)
-          setTestMsg(t('errors.safeStorageUnavailable'))
+          setTestMsg(
+            saveRes.reason === 'encrypt-throw'
+              ? t('errors.encryptThrow')
+              : t('errors.safeStorageUnavailable'),
+          )
           return
         }
         const cfg = await window.ipc.invoke(Channels.SETTINGS_GET)

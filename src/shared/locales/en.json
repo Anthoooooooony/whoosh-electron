@@ -153,6 +153,7 @@
     "DURATION_TOO_SHORT": "Recording too short",
     "UNKNOWN": "Unknown error",
     "safeStorageUnavailable": "System keychain unavailable; cannot securely save API key. Verify macOS Keychain / Windows DPAPI is accessible and retry.",
+    "encryptThrow": "Failed to encrypt API key — system keychain reported an error. macOS Keychain / Windows DPAPI may be temporarily inaccessible; retry or restart the app.",
     "pasteFailed": "Paste failed; try again or check application permissions",
     "pasteAddonUnavailable": "Native paste component is missing; recognized text was not injected into the focused app",
     "micPermissionLost": "Microphone permission was revoked or the device was taken over; recording was aborted"

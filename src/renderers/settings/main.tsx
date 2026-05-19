@@ -186,9 +186,14 @@ function SetupPane(props: SetupPaneProps): React.ReactElement {
         const saved = await saveApiKey()
         if (!saved.ok) {
           // 连接成功但本地没法安全保存 —— 用户看到的就是失败结果，不展示"已连接"假象。
+          // 按 reason narrow 两类 safeStorage 失败：能力不可用 vs 实际加密调用抛错。
+          const msg =
+            saved.reason === 'encrypt-throw'
+              ? t('errors.encryptThrow')
+              : t('errors.safeStorageUnavailable')
           setTestResult({
             ok: false,
-            msg: t('errors.safeStorageUnavailable'),
+            msg,
           })
           return
         }
