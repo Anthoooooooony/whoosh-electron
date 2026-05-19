@@ -142,8 +142,15 @@ export class DoubaoSession extends EventEmitter {
   }
 
   async finish(): Promise<void> {
-    if (this.state === 'closed' || this.state === 'error') return
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+    // finish() 仅在 ready / streaming 态合法。其它态显式抛错让上层 catch 兜底，
+    // 而非 silent return —— 后者会让 orchestrator 误以为会话正常结束、永等不来的
+    // final 事件，HUD 永久卡 processing（#50）。
+    if (this.state !== 'ready' && this.state !== 'streaming') {
+      throw new Error(`session-not-streaming: cannot finish in state '${this.state}'`)
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('session-not-streaming: ws not open')
+    }
     this.state = 'finishing'
     this.sequence += 1
     const lastFrame = encodeAudioFrame({

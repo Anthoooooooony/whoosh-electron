@@ -203,6 +203,36 @@ describe('SessionOrchestrator', () => {
     })
   })
 
+  // 对应 issue #50：ws 在 streaming 期间断开但 session 未及时 emit 'error'
+  // （例如 ready 态断开），orchestrator 在 commit 后只能靠 finish() 抛错来跳出
+  // processing。
+  describe('finish() 仅抛错（无 prior error 事件）', () => {
+    it('orchestrator 从 processing 经 catch → surfaceError → 回 idle', async () => {
+      const { orch, provider, hud, notifyHotkeyDone } = setup()
+      const fake = provider as FakeProvider
+      fake.finish = vi.fn(async (): Promise<void> => {
+        throw new Error('session-not-streaming')
+      })
+
+      orch.handleHotkeyAction('START_RECORDING')
+      await tick()
+      orch.handleHotkeyAction('COMMIT_RECORDING')
+      expect(orch.getState()).toBe('processing')
+      await tick()
+
+      // catch 把 state 翻成 'error'，HUD 报错，hotkey 被通知；不卡 processing
+      expect(orch.getState()).toBe('error')
+      expect(hud.error).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'NETWORK', message: 'session-not-streaming' }),
+      )
+      expect(notifyHotkeyDone).toHaveBeenCalledTimes(1)
+
+      // 2s linger 结束回 idle
+      vi.advanceTimersByTime(2000)
+      expect(orch.getState()).toBe('idle')
+    })
+  })
+
   describe('ws 在 finishing 期间断开', () => {
     it('provider emit error 与 finish() reject 双路径下，hotkey 只被通知一次', async () => {
       const { orch, provider, hud, notifyHotkeyDone } = setup()
