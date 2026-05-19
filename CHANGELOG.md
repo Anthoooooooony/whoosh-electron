@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.8...v0.3.0) (2026-05-19)
+
+
+### Features
+
+* **providers:** centralize provider routing via registry ([#53](https://github.com/Anthoooooooony/whoosh-electron/issues/53)) ([ccce3ff](https://github.com/Anthoooooooony/whoosh-electron/commit/ccce3ff67f33f9948704ad316f23fb7e2738e82a))
+* **providers:** centralize provider routing via registry ([#53](https://github.com/Anthoooooooony/whoosh-electron/issues/53)) ([2247271](https://github.com/Anthoooooooony/whoosh-electron/commit/22472715047ccc80866f2b3d01beff31e0fa988d))
+
+
+### Bug Fixes
+
+* **ci:** wire tag input to softprops and dispatch CI on release PR updates ([b736e96](https://github.com/Anthoooooooony/whoosh-electron/commit/b736e96810b7d4c48bd8cb6d123da6752290461a))
+* **ci:** wire tag input to softprops and dispatch CI on release PR updates ([#52](https://github.com/Anthoooooooony/whoosh-electron/issues/52)) ([37c7894](https://github.com/Anthoooooooony/whoosh-electron/commit/37c7894c8cd2ce85a4223b22e097440217fa5ce9))
+* **i18n:** use t() for safeStorage unavailable message ([#51](https://github.com/Anthoooooooony/whoosh-electron/issues/51)) ([a484583](https://github.com/Anthoooooooony/whoosh-electron/commit/a484583e1b6b778c6bbac5bea8c346feb6831cec))
+* **provider:** finish() throws when session not streaming ([#50](https://github.com/Anthoooooooony/whoosh-electron/issues/50)) ([a6c8c9f](https://github.com/Anthoooooooony/whoosh-electron/commit/a6c8c9f942e14f52610f2d9c6f1928fd63bc5fb9))
+* **provider:** finish() throws when session not streaming ([#50](https://github.com/Anthoooooooony/whoosh-electron/issues/50)) ([2fda1c9](https://github.com/Anthoooooooony/whoosh-electron/commit/2fda1c983845e58b63daa92d2bd57589828cfe11))
+* **providers:** restore .env fallback and HUD error key reset ([#53](https://github.com/Anthoooooooony/whoosh-electron/issues/53)) ([edd833a](https://github.com/Anthoooooooony/whoosh-electron/commit/edd833ad6d029f97772a6632cc4292d216d0b5a2))
+* **store:** refuse plaintext apikey fallback and auto-migrate ([#51](https://github.com/Anthoooooooony/whoosh-electron/issues/51)) ([bb4ac6e](https://github.com/Anthoooooooony/whoosh-electron/commit/bb4ac6ef57fa53d13bca8eff2a5c2872a82744b0))
+* **store:** refuse plaintext apikey fallback and auto-migrate ([#51](https://github.com/Anthoooooooony/whoosh-electron/issues/51)) ([c7c3891](https://github.com/Anthoooooooony/whoosh-electron/commit/c7c3891ada30e757e49a876fc2e83d30c9284d21))
+
 ## [0.2.8](https://github.com/Anthoooooooony/whoosh-electron/compare/v0.2.7...v0.2.8) (2026-05-15)
 
 
